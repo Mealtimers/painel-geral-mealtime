@@ -244,6 +244,154 @@
       opacity: 0.6;
     }
 
+    /* ── Newsletter ── */
+    .newsletter {
+      width: 100%;
+      margin-top: 32px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 22px;
+      animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.28s both;
+    }
+
+    .newsletter-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .newsletter-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .newsletter-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(239,68,68,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+    }
+
+    .newsletter-label {
+      font-weight: 800;
+      font-size: 0.85rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-primary);
+    }
+
+    .newsletter-date {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .newsletter-headlines {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .headline-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .headline-num {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: rgba(239,68,68,0.1);
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 0.72rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    .headline-text {
+      font-size: 0.82rem;
+      font-weight: 500;
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+
+    .newsletter-topics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .topic-tag {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      background: rgba(255,255,255,0.05);
+      color: var(--text-secondary);
+      border: 1px solid rgba(255,255,255,0.06);
+      letter-spacing: 0.02em;
+    }
+
+    .newsletter-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin-top: 14px;
+    }
+
+    .newsletter-link {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-decoration: none;
+      opacity: 0.7;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: opacity 0.2s;
+    }
+
+    .newsletter-link:hover {
+      opacity: 1;
+    }
+
+    .newsletter-loading {
+      text-align: center;
+      padding: 16px;
+      color: var(--text-tertiary);
+      font-size: 0.78rem;
+    }
+
+    .newsletter-loading .dot-pulse {
+      display: inline-block;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    @media (max-width: 460px) {
+      .newsletter { padding: 18px 16px; }
+      .newsletter-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+    }
+
     /* ── Footer ── */
     .hub-footer {
       margin-top: 40px;
@@ -302,6 +450,12 @@
   </header>
 
   <div class="hub-grid" id="hubGrid"></div>
+
+  <section class="newsletter" id="newsletter">
+    <div class="newsletter-loading">
+      <span class="dot-pulse">Carregando newsletter do dia...</span>
+    </div>
+  </section>
 
   <footer class="hub-footer">
     Meal Time &copy; 2026
@@ -413,6 +567,74 @@
     card.innerHTML = h;
     grid.appendChild(card);
   });
+
+  // ╔══════════════════════════════════════════════════════════════╗
+  // ║  NEWSLETTER DO DIA — puxa do Notion via /api/newsletter    ║
+  // ╚══════════════════════════════════════════════════════════════╝
+
+  (function loadNewsletter() {
+    var el = document.getElementById('newsletter');
+
+    fetch('/api/newsletter')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) throw new Error(data.error);
+
+        var manchetes = [data.manchete1, data.manchete2, data.manchete3].filter(Boolean);
+        if (manchetes.length === 0) throw new Error('Sem manchetes');
+
+        var dataFormatada = '';
+        if (data.data) {
+          var d = new Date(data.data + 'T12:00:00');
+          var dias = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+          var meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+          dataFormatada = dias[d.getDay()] + ', ' + d.getDate() + ' de ' + meses[d.getMonth()] + ' de ' + d.getFullYear();
+        }
+
+        var headlinesHtml = '';
+        manchetes.forEach(function(m, i) {
+          headlinesHtml +=
+            '<div class="headline-item">' +
+              '<div class="headline-num">' + (i + 1) + '</div>' +
+              '<div class="headline-text">' + m + '</div>' +
+            '</div>';
+        });
+
+        var topicsHtml = '';
+        if (data.topicos && data.topicos.length > 0) {
+          topicsHtml = '<div class="newsletter-topics">';
+          data.topicos.forEach(function(t) {
+            topicsHtml += '<span class="topic-tag">' + t + '</span>';
+          });
+          topicsHtml += '</div>';
+        }
+
+        var notionLink = '';
+        if (data.notionUrl) {
+          notionLink =
+            '<div class="newsletter-footer">' +
+              '<a class="newsletter-link" href="' + data.notionUrl + '" target="_blank" rel="noopener">' +
+                'Ler completa ' + arrow +
+              '</a>' +
+            '</div>';
+        }
+
+        el.innerHTML =
+          '<div class="newsletter-header">' +
+            '<div class="newsletter-title">' +
+              '<div class="newsletter-icon">📰</div>' +
+              '<span class="newsletter-label">Newsletter do Dia</span>' +
+            '</div>' +
+            '<div class="newsletter-date">' + dataFormatada + '</div>' +
+          '</div>' +
+          '<div class="newsletter-headlines">' + headlinesHtml + '</div>' +
+          topicsHtml +
+          notionLink;
+      })
+      .catch(function() {
+        el.style.display = 'none';
+      });
+  })();
 </script>
 
 </body>
