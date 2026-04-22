@@ -303,6 +303,16 @@
       display: flex;
       gap: 14px;
       align-items: flex-start;
+      padding: 14px 12px;
+      border-radius: var(--radius-sm);
+      transition: background 0.2s;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .headline-item:hover {
+      background: rgba(255,255,255,0.04);
     }
 
     .headline-num {
@@ -317,14 +327,43 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-top: 1px;
+      margin-top: 2px;
+    }
+
+    .headline-content {
+      flex: 1;
+      min-width: 0;
     }
 
     .headline-text {
       font-size: 0.82rem;
-      font-weight: 500;
-      line-height: 1.5;
+      font-weight: 600;
+      line-height: 1.45;
       color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .headline-summary {
+      font-size: 0.74rem;
+      font-weight: 400;
+      line-height: 1.55;
+      color: var(--text-secondary);
+    }
+
+    .headline-read-more {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--accent);
+      opacity: 0;
+      margin-top: 6px;
+      transition: opacity 0.2s;
+    }
+
+    .headline-item:hover .headline-read-more {
+      opacity: 0.8;
     }
 
     .newsletter-topics {
@@ -580,8 +619,14 @@
       .then(function(data) {
         if (data.error) throw new Error(data.error);
 
-        var manchetes = [data.manchete1, data.manchete2, data.manchete3].filter(Boolean);
-        if (manchetes.length === 0) throw new Error('Sem manchetes');
+        var items = [
+          { manchete: data.manchete1, resumo: data.resumo1 },
+          { manchete: data.manchete2, resumo: data.resumo2 },
+          { manchete: data.manchete3, resumo: data.resumo3 }
+        ].filter(function(x) { return x.manchete; });
+        if (items.length === 0) throw new Error('Sem manchetes');
+
+        var notionLink = data.notionUrl || '#';
 
         var dataFormatada = '';
         if (data.data) {
@@ -592,12 +637,19 @@
         }
 
         var headlinesHtml = '';
-        manchetes.forEach(function(m, i) {
+        items.forEach(function(item, i) {
+          var resumoHtml = item.resumo
+            ? '<div class="headline-summary">' + item.resumo + '</div>'
+            : '';
           headlinesHtml +=
-            '<div class="headline-item">' +
+            '<a class="headline-item" href="' + notionLink + '" target="_blank" rel="noopener">' +
               '<div class="headline-num">' + (i + 1) + '</div>' +
-              '<div class="headline-text">' + m + '</div>' +
-            '</div>';
+              '<div class="headline-content">' +
+                '<div class="headline-text">' + item.manchete + '</div>' +
+                resumoHtml +
+                '<div class="headline-read-more">Ler matéria ' + arrow + '</div>' +
+              '</div>' +
+            '</a>';
         });
 
         var topicsHtml = '';

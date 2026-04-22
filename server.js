@@ -76,6 +76,9 @@ async function fetchNewsletter() {
     manchete1: getText(props['Manchete 1']),
     manchete2: getText(props['Manchete 2']),
     manchete3: getText(props['Manchete 3']),
+    resumo1: getText(props['Resumo 1']),
+    resumo2: getText(props['Resumo 2']),
+    resumo3: getText(props['Resumo 3']),
     topicos: getTopics(props['Tópicos']),
     notionUrl: page.url || '',
   };
