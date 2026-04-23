@@ -611,7 +611,7 @@
   // ║  NEWSLETTER DO DIA — puxa do Notion via /api/newsletter    ║
   // ╚══════════════════════════════════════════════════════════════╝
 
-  (function loadNewsletter() {
+  function renderNewsletter() {
     var el = document.getElementById('newsletter');
 
     fetch('/api/newsletter')
@@ -626,7 +626,7 @@
         ].filter(function(x) { return x.manchete; });
         if (items.length === 0) throw new Error('Sem manchetes');
 
-        var notionLink = data.notionUrl || '#';
+        var pageUrl = data.notionUrl || '#';
 
         var dataFormatada = '';
         if (data.data) {
@@ -642,7 +642,7 @@
             ? '<div class="headline-summary">' + item.resumo + '</div>'
             : '';
           headlinesHtml +=
-            '<a class="headline-item" href="' + notionLink + '" target="_blank" rel="noopener">' +
+            '<a class="headline-item" href="' + pageUrl + '" target="_blank" rel="noopener">' +
               '<div class="headline-num">' + (i + 1) + '</div>' +
               '<div class="headline-content">' +
                 '<div class="headline-text">' + item.manchete + '</div>' +
@@ -661,9 +661,9 @@
           topicsHtml += '</div>';
         }
 
-        var notionLink = '';
+        var footerHtml = '';
         if (data.notionUrl) {
-          notionLink =
+          footerHtml =
             '<div class="newsletter-footer">' +
               '<a class="newsletter-link" href="' + data.notionUrl + '" target="_blank" rel="noopener">' +
                 'Ler completa ' + arrow +
@@ -681,12 +681,16 @@
           '</div>' +
           '<div class="newsletter-headlines">' + headlinesHtml + '</div>' +
           topicsHtml +
-          notionLink;
+          footerHtml;
       })
       .catch(function() {
         el.style.display = 'none';
       });
-  })();
+  }
+
+  // Carrega imediatamente e atualiza a cada 5 minutos
+  renderNewsletter();
+  setInterval(renderNewsletter, 5 * 60 * 1000);
 </script>
 
 </body>

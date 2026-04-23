@@ -7,9 +7,9 @@ const PORT = process.env.PORT || 3050;
 const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
 const NOTION_DB_ID = process.env.NOTION_DB_ID || '12bb62ac-a681-4f41-b6e5-87ecaa1151da';
 
-// ── Cache da newsletter (5 min) ──
+// ── Cache da newsletter (2 min) ──
 let newsletterCache = { data: null, ts: 0 };
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 2 * 60 * 1000;
 
 function notionRequest(endpoint, body) {
   return new Promise((resolve, reject) => {
