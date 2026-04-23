@@ -151,12 +151,8 @@
       background: var(--mt-card);
       border: 1px solid var(--border);
       border-radius: var(--r);
-      padding: 16px 14px;
+      padding: 12px 12px;
       transition: border-color 0.3s;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
     }
 
     .a-card:hover { border-color: var(--border-hover); }
@@ -169,16 +165,16 @@
     }
 
     .a-icon {
-      width: 32px; height: 32px;
-      border-radius: 8px;
+      width: 26px; height: 26px;
+      border-radius: 7px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.9rem;
+      font-size: 0.78rem;
     }
 
-    .a-title { font-weight: 700; font-size: 0.78rem; }
-    .a-sub { font-size: 0.62rem; color: var(--text-tertiary); font-weight: 500; }
+    .a-title { font-weight: 700; font-size: 0.72rem; }
+    .a-sub { font-size: 0.58rem; color: var(--text-tertiary); font-weight: 500; }
 
     .a-big {
       font-size: 1.5rem;
@@ -231,17 +227,17 @@
     }
 
     .a-empty {
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       color: var(--text-tertiary);
       text-align: center;
-      padding: 18px 10px;
+      padding: 10px;
     }
 
     .a-load {
       text-align: center;
-      padding: 24px 10px;
+      padding: 20px 10px;
       color: var(--text-tertiary);
-      font-size: 0.75rem;
+      font-size: 0.7rem;
     }
 
     .a-valor {
@@ -316,13 +312,13 @@
         var(--mt-dark);
     }
 
-    .center-wrap { width: 100%; max-width: 620px; }
+    .center-wrap { width: 100%; max-width: 780px; }
 
     .center-sub {
       text-align: center;
-      font-size: 0.76rem;
+      font-size: 0.85rem;
       color: var(--text-secondary);
-      margin-bottom: 24px;
+      margin-bottom: 28px;
       font-weight: 500;
     }
 
@@ -330,19 +326,19 @@
     .grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 11px;
+      gap: 14px;
     }
 
     .app {
       background: var(--mt-card);
       border: 1px solid var(--border);
       border-radius: var(--r);
-      padding: 16px 14px;
+      padding: 22px 18px;
       text-decoration: none;
       color: var(--text-primary);
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 10px;
       cursor: pointer;
       transition: all 0.25s cubic-bezier(.4,0,.2,1);
       animation: fadeUp 0.4s cubic-bezier(.4,0,.2,1) both;
@@ -367,34 +363,34 @@
     }
 
     .app-icon {
-      width: 34px; height: 34px;
-      border-radius: 9px;
+      width: 42px; height: 42px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1rem;
+      font-size: 1.2rem;
     }
 
     .app-dot {
-      width: 7px; height: 7px;
+      width: 8px; height: 8px;
       border-radius: 50%;
       background: var(--mt-green);
       box-shadow: 0 0 6px rgba(92,184,92,0.5);
     }
 
-    .app-name { font-weight: 700; font-size: 0.8rem; }
-    .app-desc { font-size: 0.66rem; color: var(--text-secondary); line-height: 1.4; }
+    .app-name { font-weight: 700; font-size: 0.92rem; }
+    .app-desc { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5; }
 
     .app-go {
       margin-top: auto;
-      padding-top: 3px;
-      font-size: 0.62rem;
+      padding-top: 6px;
+      font-size: 0.7rem;
       font-weight: 600;
       color: var(--mt-red);
       opacity: 0.5;
       display: flex;
       align-items: center;
-      gap: 3px;
+      gap: 4px;
       transition: opacity 0.2s;
     }
 
@@ -427,31 +423,31 @@
     }
 
     .sub:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.1); }
-    .sub .sd { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.3; }
+    .sub .sd { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.3; }
     .sub .sa { margin-left: auto; opacity: 0.25; transition: all 0.2s; }
     .sub:hover .sa { transform: translateX(2px); opacity: 0.5; }
 
     /* Versículo — discreto */
     .verse-section {
-      margin-top: 20px;
+      margin-top: 28px;
       text-align: center;
-      padding: 10px 16px;
+      padding: 12px 16px;
       animation: fadeUp 0.5s cubic-bezier(.4,0,.2,1) 0.22s both;
     }
 
     .verse-text {
       font-family: "Google Sans", "Inter", serif;
-      font-size: 0.68rem;
+      font-size: 0.76rem;
       font-style: italic;
       font-weight: 400;
-      line-height: 1.55;
+      line-height: 1.6;
       color: var(--text-tertiary);
-      max-width: 420px;
-      margin: 0 auto 4px;
+      max-width: 500px;
+      margin: 0 auto 6px;
     }
 
     .verse-ref {
-      font-size: 0.58rem;
+      font-size: 0.65rem;
       font-weight: 500;
       color: var(--mt-red);
       opacity: 0.45;
@@ -460,9 +456,9 @@
 
     .footer {
       text-align: center;
-      margin-top: 18px;
+      margin-top: 20px;
       color: var(--text-tertiary);
-      font-size: 0.58rem;
+      font-size: 0.62rem;
       letter-spacing: 0.08em;
     }
 
