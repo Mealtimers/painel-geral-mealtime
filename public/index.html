@@ -131,7 +131,7 @@
     .side-left {
       background: var(--mt-panel);
       border-right: 1px solid var(--border);
-      padding: 18px 14px;
+      padding: 20px 14px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -151,8 +151,12 @@
       background: var(--mt-card);
       border: 1px solid var(--border);
       border-radius: var(--r);
-      padding: 12px 12px;
+      padding: 16px 14px;
       transition: border-color 0.3s;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
 
     .a-card:hover { border-color: var(--border-hover); }
@@ -165,16 +169,16 @@
     }
 
     .a-icon {
-      width: 26px; height: 26px;
-      border-radius: 7px;
+      width: 32px; height: 32px;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.78rem;
+      font-size: 0.9rem;
     }
 
-    .a-title { font-weight: 700; font-size: 0.72rem; }
-    .a-sub { font-size: 0.58rem; color: var(--text-tertiary); font-weight: 500; }
+    .a-title { font-weight: 700; font-size: 0.78rem; }
+    .a-sub { font-size: 0.62rem; color: var(--text-tertiary); font-weight: 500; }
 
     .a-big {
       font-size: 1.5rem;
@@ -227,17 +231,17 @@
     }
 
     .a-empty {
-      font-size: 0.7rem;
+      font-size: 0.75rem;
       color: var(--text-tertiary);
       text-align: center;
-      padding: 10px;
+      padding: 18px 10px;
     }
 
     .a-load {
       text-align: center;
-      padding: 20px 10px;
+      padding: 24px 10px;
       color: var(--text-tertiary);
-      font-size: 0.7rem;
+      font-size: 0.75rem;
     }
 
     .a-valor {
