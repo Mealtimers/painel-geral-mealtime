@@ -7,9 +7,21 @@ const PORT = process.env.PORT || 3050;
 const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
 const NOTION_DB_ID = process.env.NOTION_DB_ID || '12bb62ac-a681-4f41-b6e5-87ecaa1151da';
 
-// ── Cache da newsletter (2 min) ──
-let newsletterCache = { data: null, ts: 0 };
+// ── BI Bling config ──
+const BI_API_URL = process.env.BI_API_URL || 'https://bi-bling-production.up.railway.app';
+const BI_ADMIN_USER = process.env.BI_ADMIN_USER || '';
+const BI_ADMIN_PASS = process.env.BI_ADMIN_PASS || '';
+
+// ── Caches (2 min) ──
 const CACHE_TTL = 2 * 60 * 1000;
+let newsletterCache = { data: null, ts: 0 };
+let contasCache = { data: null, ts: 0 };
+let pedidosCache = { data: null, ts: 0 };
+let biToken = { token: null, expiresAt: 0 };
+
+// ═══════════════════════════════════════
+//  NOTION — Newsletter
+// ═══════════════════════════════════════
 
 function notionRequest(endpoint, body) {
   return new Promise((resolve, reject) => {
@@ -87,6 +99,148 @@ async function fetchNewsletter() {
   return data;
 }
 
+// ═══════════════════════════════════════
+//  BI BLING — Auth + Proxy
+// ═══════════════════════════════════════
+
+function biRequest(method, urlPath) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(BI_API_URL);
+    const opts = {
+      hostname: parsed.hostname,
+      port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+      path: urlPath,
+      method,
+      headers: { 'Content-Type': 'application/json' },
+    };
+    if (biToken.token) {
+      opts.headers['Authorization'] = `Bearer ${biToken.token}`;
+    }
+    const transport = parsed.protocol === 'https:' ? https : http;
+    const req = transport.request(opts, (res) => {
+      let body = '';
+      res.on('data', (c) => body += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+        catch { resolve({ status: res.statusCode, data: body }); }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function biPost(urlPath, payload) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(BI_API_URL);
+    const body = JSON.stringify(payload);
+    const opts = {
+      hostname: parsed.hostname,
+      port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+      path: urlPath,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    };
+    const transport = parsed.protocol === 'https:' ? https : http;
+    const req = transport.request(opts, (res) => {
+      let data = '';
+      res.on('data', (c) => data += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
+        catch { resolve({ status: res.statusCode, data }); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function ensureBiToken() {
+  if (biToken.token && Date.now() < biToken.expiresAt - 60000) {
+    return biToken.token;
+  }
+  if (!BI_ADMIN_USER || !BI_ADMIN_PASS) {
+    throw new Error('BI credentials not configured');
+  }
+  const res = await biPost('/api/auth/login', {
+    usuario: BI_ADMIN_USER,
+    senha: BI_ADMIN_PASS,
+  });
+  if (res.status !== 200 || !res.data.token) {
+    throw new Error('BI login failed: ' + JSON.stringify(res.data));
+  }
+  biToken = {
+    token: res.data.token,
+    expiresAt: Date.now() + (res.data.expiresIn || 3600) * 1000,
+  };
+  return biToken.token;
+}
+
+// Contas a pagar do dia — resumo por conta
+async function fetchContasResumo() {
+  if (contasCache.data && Date.now() - contasCache.ts < CACHE_TTL) {
+    return contasCache.data;
+  }
+
+  await ensureBiToken();
+  const today = new Date().toISOString().slice(0, 10);
+  const res = await biRequest('GET',
+    `/api/bi/contas-pagar?dateFrom=${today}&dateTo=${today}&dateField=vencimento`
+  );
+
+  if (res.status !== 200 || !res.data.ok) {
+    throw new Error('BI contas-pagar error');
+  }
+
+  const porConta = {};
+  let total = 0;
+  for (const row of (res.data.rows || [])) {
+    if (row.situacao === 'PAGO') continue;
+    const nome = row.accountName || 'Sem conta';
+    if (!porConta[nome]) porConta[nome] = 0;
+    porConta[nome]++;
+    total++;
+  }
+
+  const data = { total, porConta, data: today };
+  contasCache = { data, ts: Date.now() };
+  return data;
+}
+
+// Pedidos do dia — resumo
+async function fetchPedidosResumo() {
+  if (pedidosCache.data && Date.now() - pedidosCache.ts < CACHE_TTL) {
+    return pedidosCache.data;
+  }
+
+  await ensureBiToken();
+  const today = new Date().toISOString().slice(0, 10);
+  const res = await biRequest('GET',
+    `/api/bi/sales/analytics?dateFrom=${today}&dateTo=${today}`
+  );
+
+  if (res.status !== 200) {
+    throw new Error('BI sales error');
+  }
+
+  const summary = res.data.summary || {};
+  const data = {
+    total: summary.ordersCount || 0,
+    valor: summary.ordersValue || 0,
+    data: today,
+  };
+  pedidosCache = { data, ts: Date.now() };
+  return data;
+}
+
+// ═══════════════════════════════════════
+//  HTTP SERVER
+// ═══════════════════════════════════════
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css':  'text/css; charset=utf-8',
@@ -100,39 +254,69 @@ const MIME = {
 
 const PUBLIC = path.join(__dirname, 'public');
 
+function jsonRes(res, status, obj) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  });
+  res.end(JSON.stringify(obj));
+}
+
 const server = http.createServer((req, res) => {
+  const url = req.url.split('?')[0];
+
   // Health check
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+  if (url === '/health') {
+    return jsonRes(res, 200, { status: 'ok', uptime: process.uptime() });
   }
 
   // Newsletter API
-  if (req.url === '/api/newsletter') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+  if (url === '/api/newsletter') {
     if (!NOTION_API_KEY) {
-      res.writeHead(503, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ error: 'NOTION_API_KEY não configurada' }));
+      return jsonRes(res, 503, { error: 'NOTION_API_KEY não configurada' });
     }
     fetchNewsletter()
       .then((data) => {
-        if (!data) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: 'Nenhuma edição encontrada' }));
-        }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(data));
+        if (!data) return jsonRes(res, 404, { error: 'Nenhuma edição encontrada' });
+        jsonRes(res, 200, data);
       })
       .catch((err) => {
         console.error('[Newsletter] Erro:', err.message);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Erro ao buscar newsletter' }));
+        jsonRes(res, 500, { error: 'Erro ao buscar newsletter' });
+      });
+    return;
+  }
+
+  // Contas a pagar resumo
+  if (url === '/api/contas-resumo') {
+    if (!BI_ADMIN_USER) {
+      return jsonRes(res, 503, { error: 'BI credentials não configuradas' });
+    }
+    fetchContasResumo()
+      .then((data) => jsonRes(res, 200, data))
+      .catch((err) => {
+        console.error('[Contas] Erro:', err.message);
+        jsonRes(res, 500, { error: 'Erro ao buscar contas a pagar' });
+      });
+    return;
+  }
+
+  // Pedidos do dia resumo
+  if (url === '/api/pedidos-resumo') {
+    if (!BI_ADMIN_USER) {
+      return jsonRes(res, 503, { error: 'BI credentials não configuradas' });
+    }
+    fetchPedidosResumo()
+      .then((data) => jsonRes(res, 200, data))
+      .catch((err) => {
+        console.error('[Pedidos] Erro:', err.message);
+        jsonRes(res, 500, { error: 'Erro ao buscar pedidos' });
       });
     return;
   }
 
   // Serve static files
-  let filePath = req.url === '/' ? '/index.html' : req.url;
+  let filePath = url === '/' ? '/index.html' : url;
   filePath = path.join(PUBLIC, filePath);
 
   // Prevent directory traversal
@@ -146,7 +330,6 @@ const server = http.createServer((req, res) => {
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
-      // Fallback to index.html for SPA-like behavior
       fs.readFile(path.join(PUBLIC, 'index.html'), (err2, fallback) => {
         if (err2) {
           res.writeHead(404);
