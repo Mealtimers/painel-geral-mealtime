@@ -180,6 +180,13 @@ async function ensureBiToken() {
   return biToken.token;
 }
 
+// Helper: data de hoje no fuso de Brasília (UTC-3)
+function todayBRT() {
+  return new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })
+  ).toISOString().slice(0, 10);
+}
+
 // Contas a pagar do dia — resumo por conta
 async function fetchContasResumo() {
   if (contasCache.data && Date.now() - contasCache.ts < CACHE_TTL) {
@@ -187,7 +194,7 @@ async function fetchContasResumo() {
   }
 
   await ensureBiToken();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayBRT();
   const res = await biRequest('GET',
     `/api/bi/contas-pagar?dateFrom=${today}&dateTo=${today}&dateField=vencimento`
   );
@@ -218,7 +225,7 @@ async function fetchPedidosResumo() {
   }
 
   await ensureBiToken();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayBRT();
   const res = await biRequest('GET',
     `/api/bi/sales/analytics?dateFrom=${today}&dateTo=${today}`
   );
