@@ -406,6 +406,59 @@
     .i-ecom  { background: var(--purple-soft); color: var(--purple); }
     .i-fin   { background: var(--blue-soft); color: #60a5fa; }
     .i-meta  { background: var(--cyan-soft); color: var(--cyan); }
+    .i-mkt   { background: rgba(250,204,21,0.10); color: #facc15; }
+    .i-estoque { background: rgba(251,146,60,0.10); color: #fb923c; }
+
+    /* Seções de categoria */
+    .section-block { margin-bottom: 22px; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 0 2px;
+    }
+    .section-icon {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .section-icon.si-lojas  { background: rgba(168,85,247,0.12); color: #a855f7; }
+    .section-icon.si-fabrica { background: rgba(251,191,36,0.12); color: #fbbf24; }
+    .section-icon.si-bi      { background: rgba(96,165,250,0.12); color: #60a5fa; }
+    .section-title-text {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+    .section-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .app.coming-soon {
+      opacity: 0.4;
+      pointer-events: none;
+      cursor: default;
+    }
+    .app.coming-soon .app-go { display: none; }
+    .coming-badge {
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-top: auto;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
 
     /* Sublinks */
     .subs { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
@@ -713,51 +766,90 @@
     t(); setInterval(t, 30000);
   })();
 
-  /* ═══ APPS ═══ */
-  var APPS = [
-    { id:'crm', title:'CRM', desc:'Clientes, leads e pipeline.', icon:'\u{1F465}', ic:'i-crm',
-      url:'https://meal-time-crm-production.up.railway.app/' },
-    { id:'bi', title:'BI ERP', desc:'Pedidos, faturamento e analytics.', icon:'\u{1F4CA}', ic:'i-bi',
-      url:'https://bi-bling-production.up.railway.app/bi.html#vendas' },
-    { id:'dietas', title:'Gerador de Pedidos', desc:'Cardápios personalizados.', icon:'\u{1F957}', ic:'i-dietas',
-      url:'https://charismatic-friendship-production-b81d.up.railway.app/' },
-    { id:'ecom', title:'E-commerce', desc:'Prefiro Delivery.', icon:'\u{1F6D2}', ic:'i-ecom', url:null,
-      subs:[
-        {l:'Pelotas', u:'https://painel.prefirodelivery.com/pelotas_mealtime'},
-        {l:'Santa Maria', u:'https://painel.prefirodelivery.com/santamaria_mealtime'}
-      ]},
-    { id:'fin', title:'Financeiro / ERP', desc:'Bling \u2014 contas e NFs.', icon:'\u{1F4B0}', ic:'i-fin',
-      url:'https://www.bling.com.br/inicio#/' },
-    { id:'meta', title:'Meta Ads', desc:'Campanhas e performance.', icon:'\u{1F4E2}', ic:'i-meta',
-      url:'https://meta-ads-dashboard-production-1f44.up.railway.app' }
+  /* ═══ APPS POR SEÇÃO ═══ */
+  var SECTIONS = [
+    {
+      title: 'Canal de Vendas',
+      icon: '🛍️',
+      iconClass: 'si-lojas',
+      apps: [
+        { id:'meta', title:'Meta Ads', desc:'Campanhas e performance.', icon:'📢', ic:'i-meta',
+          url:'https://meta-ads-dashboard-production-1f44.up.railway.app' },
+        { id:'ecom', title:'E-commerce', desc:'Prefiro Delivery.', icon:'🛒', ic:'i-ecom', url:null,
+          subs:[
+            {l:'Pelotas', u:'https://painel.prefirodelivery.com/pelotas_mealtime'},
+            {l:'Santa Maria', u:'https://painel.prefirodelivery.com/santamaria_mealtime'}
+          ]},
+        { id:'crm', title:'CRM', desc:'Clientes e recompra.', icon:'👥', ic:'i-crm',
+          url:'https://meal-time-crm-production.up.railway.app/' },
+        { id:'mkt', title:'MKT — Marketing', desc:'Conteúdo e orgânico.', icon:'📋', ic:'i-mkt',
+          url:'https://marketing-hub-mealtime-production.up.railway.app' }
+      ]
+    },
+    {
+      title: 'Produção',
+      icon: '🏭',
+      iconClass: 'si-fabrica',
+      apps: [
+        { id:'estoque', title:'Estoque Fábrica', desc:'Inventário e produção.', icon:'📦', ic:'i-estoque',
+          url:null, comingSoon:true },
+        { id:'dietas', title:'Gerador de Pedidos', desc:'Personalizados e B2B.', icon:'🥗', ic:'i-dietas',
+          url:'https://charismatic-friendship-production-b81d.up.railway.app/' },
+        { id:'fin', title:'Financeiro / ERP', desc:'Bling — contas e NFs.', icon:'💰', ic:'i-fin',
+          url:'https://www.bling.com.br/inicio#/' }
+      ]
+    },
+    {
+      title: 'Dados & Inteligência',
+      icon: '📊',
+      iconClass: 'si-bi',
+      apps: [
+        { id:'bi', title:'BI — Inteligência de Negócio', desc:'Fábrica, lojas e performance.', icon:'📊', ic:'i-bi',
+          url:'https://bi-bling-production.up.railway.app/bi.html#vendas' }
+      ]
+    }
   ];
 
   var g = document.getElementById('grid');
   var ar = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
 
-  APPS.forEach(function(a){
-    var hs = a.subs && a.subs.length;
-    var c = document.createElement(hs ? 'div' : 'a');
-    c.className = 'app';
-    if(!hs){
-      c.href = a.url || '#';
-      c.target = '_blank';
-      c.rel = 'noopener';
-      if(!a.url) c.addEventListener('click', function(e){ e.preventDefault(); });
-    }
-    var h = '<div class="app-top"><div class="app-icon '+a.ic+'">'+a.icon+'</div><div class="app-dot"></div></div>'+
-      '<div class="app-name">'+a.title+'</div><div class="app-desc">'+a.desc+'</div>';
-    if(hs){
-      h += '<div class="subs">';
-      a.subs.forEach(function(s){
-        h += '<a class="sub" href="'+s.u+'" target="_blank" rel="noopener"><span class="sd"></span>'+s.l+'<span class="sa">'+ar+'</span></a>';
-      });
-      h += '</div>';
-    } else {
-      h += '<div class="app-go">Acessar '+ar+'</div>';
-    }
-    c.innerHTML = h;
-    g.appendChild(c);
+  SECTIONS.forEach(function(sec){
+    var block = document.createElement('div');
+    block.className = 'section-block';
+    block.innerHTML = '<div class="section-header"><div class="section-icon '+sec.iconClass+'">'+sec.icon+'</div><span class="section-title-text">'+sec.title+'</span><div class="section-line"></div></div>';
+
+    var gridDiv = document.createElement('div');
+    gridDiv.className = 'grid';
+
+    sec.apps.forEach(function(a){
+      var hs = a.subs && a.subs.length;
+      var c = document.createElement(hs ? 'div' : 'a');
+      c.className = 'app' + (a.comingSoon ? ' coming-soon' : '');
+      if(!hs && !a.comingSoon){
+        c.href = a.url || '#';
+        c.target = '_blank';
+        c.rel = 'noopener';
+        if(!a.url) c.addEventListener('click', function(e){ e.preventDefault(); });
+      }
+      var h = '<div class="app-top"><div class="app-icon '+a.ic+'">'+a.icon+'</div>'+(a.comingSoon?'':'<div class="app-dot"></div>')+'</div>'+
+        '<div class="app-name">'+a.title+'</div><div class="app-desc">'+a.desc+'</div>';
+      if(a.comingSoon){
+        h += '<div class="coming-badge">Em breve</div>';
+      } else if(hs){
+        h += '<div class="subs">';
+        a.subs.forEach(function(s){
+          h += '<a class="sub" href="'+s.u+'" target="_blank" rel="noopener"><span class="sd"></span>'+s.l+'<span class="sa">'+ar+'</span></a>';
+        });
+        h += '</div>';
+      } else {
+        h += '<div class="app-go">Acessar '+ar+'</div>';
+      }
+      c.innerHTML = h;
+      gridDiv.appendChild(c);
+    });
+
+    block.appendChild(gridDiv);
+    g.appendChild(block);
   });
 
   /* ═══ VERSÍCULO DO DIA ═══ */
