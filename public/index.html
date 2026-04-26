@@ -330,6 +330,67 @@
       font-variant-numeric: tabular-nums;
     }
 
+    .d-head { cursor: pointer; user-select: none; }
+
+    .d-toggle {
+      margin-left: auto;
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s;
+      flex-shrink: 0;
+    }
+
+    .d-toggle svg {
+      transition: transform 0.25s;
+    }
+
+    .d-card.expanded .d-toggle svg {
+      transform: rotate(180deg);
+    }
+
+    .d-toggle:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .d-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(.4,0,.2,1), opacity 0.25s;
+      opacity: 0;
+    }
+
+    .d-card.expanded .d-body {
+      max-height: 300px;
+      opacity: 1;
+    }
+
+    .d-total-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: 7px;
+      background: rgba(255,255,255,0.04);
+      margin-top: 6px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .d-total-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .d-total-val {
+      font-size: 0.82rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
     .d-rows { display: flex; flex-direction: column; gap: 4px; }
 
     .d-row {
@@ -363,6 +424,12 @@
       font-size: 0.78rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
+    }
+
+    .d-row-val {
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: var(--text-tertiary);
     }
 
     .d-empty {
@@ -670,6 +737,13 @@
   /* ═══ SIDEBAR MENU ═══ */
   var SECTIONS = [
     {
+      title: 'Dados & Inteligencia',
+      apps: [
+        { id:'bi', title:'BI Inteligencia', desc:'Fabrica, lojas e KPIs', icon:'📊', ic:'i-bi',
+          url:'https://bi-bling-production.up.railway.app/bi.html#vendas' }
+      ]
+    },
+    {
       title: 'Canal de Vendas',
       apps: [
         { id:'meta', title:'Meta Ads', desc:'Campanhas', icon:'📢', ic:'i-meta',
@@ -694,13 +768,6 @@
           url:'https://charismatic-friendship-production-b81d.up.railway.app/' },
         { id:'fin', title:'Financeiro / ERP', desc:'Bling — contas e NFs', icon:'💰', ic:'i-fin',
           url:'https://www.bling.com.br/inicio#/' }
-      ]
-    },
-    {
-      title: 'Dados & Inteligencia',
-      apps: [
-        { id:'bi', title:'BI Inteligencia', desc:'Fabrica, lojas e KPIs', icon:'📊', ic:'i-bi',
-          url:'https://bi-bling-production.up.railway.app/bi.html#vendas' }
       ]
     }
   ];
@@ -748,6 +815,13 @@
     });
   })();
 
+  var chevronSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+
+  function toggleCard(cardId){
+    var el = document.getElementById(cardId);
+    el.classList.toggle('expanded');
+  }
+
   /* ═══ CONTAS A PAGAR ═══ */
   function renderContas(){
     fetch('/api/contas-resumo')
@@ -756,19 +830,27 @@
         var el = document.getElementById('alertContas');
         if(d.error){ el.innerHTML='<div class="d-empty">Sem dados</div>'; return; }
 
+        var wasExpanded = el.classList.contains('expanded');
         var bk='', contas=d.porConta||{}, nomes=Object.keys(contas).sort();
+        var valores=d.valoresPorConta||{};
         var cores=['#e85d5d','#a78bfa','#60a5fa','#6dcf6d'];
 
         nomes.forEach(function(n,i){
-          bk += '<div class="d-row"><span class="d-row-name"><span class="d-dot" style="background:'+cores[i%4]+'"></span>'+n+'</span><span class="d-row-n">'+contas[n]+'</span></div>';
+          var valStr = valores[n] ? ' · R$ '+(valores[n]).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
+          bk += '<div class="d-row"><span class="d-row-name"><span class="d-dot" style="background:'+cores[i%4]+'"></span>'+n+'</span><span class="d-row-n">'+contas[n]+'<span class="d-row-val">'+valStr+'</span></span></div>';
         });
 
         if(!nomes.length) bk='<div class="d-empty" style="color:var(--mt-green)">Nenhuma conta hoje</div>';
 
+        var totalVal = (d.valorTotal||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+        var totalRow = d.total > 0 ? '<div class="d-total-row"><span class="d-total-label">Total a pagar</span><span class="d-total-val" style="color:var(--mt-red)">R$ '+totalVal+'</span></div>' : '';
+
         el.innerHTML =
-          '<div class="d-head"><div class="d-icon" style="background:var(--mt-red-soft);color:var(--mt-red)">📋</div><div><div class="d-title">Contas a Pagar</div><div class="d-sub">Vencimento hoje</div></div></div>'+
+          '<div class="d-head" onclick="toggleCard(\'alertContas\')"><div class="d-icon" style="background:var(--mt-red-soft);color:var(--mt-red)">📋</div><div><div class="d-title">Contas a Pagar</div><div class="d-sub">Vencimento hoje</div></div><div class="d-toggle">'+chevronSvg+'</div></div>'+
           '<div class="d-big" style="color:var(--mt-red)">'+d.total+'</div>'+
-          '<div class="d-rows">'+bk+'</div>';
+          '<div class="d-body"><div class="d-rows">'+bk+'</div>'+totalRow+'</div>';
+
+        if(wasExpanded) el.classList.add('expanded');
       })
       .catch(function(){ document.getElementById('alertContas').innerHTML='<div class="d-empty">Contas indisponivel</div>'; });
   }
@@ -781,12 +863,28 @@
         var el = document.getElementById('alertPedidos');
         if(d.error){ el.innerHTML='<div class="d-empty">Sem dados</div>'; return; }
 
+        var wasExpanded = el.classList.contains('expanded');
         var val = (d.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
 
+        var detalhes = '';
+        if(d.porLoja){
+          var lojas = Object.keys(d.porLoja).sort();
+          var cores=['#6dcf6d','#60a5fa','#a78bfa','#e85d5d'];
+          lojas.forEach(function(l,i){
+            var loja = d.porLoja[l];
+            var lojaVal = (loja.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+            detalhes += '<div class="d-row"><span class="d-row-name"><span class="d-dot" style="background:'+cores[i%4]+'"></span>'+l+'</span><span class="d-row-n">'+loja.qtd+' <span class="d-row-val"> · R$ '+lojaVal+'</span></span></div>';
+          });
+        }
+
+        var totalRow = '<div class="d-total-row"><span class="d-total-label">Total vendido</span><span class="d-total-val" style="color:var(--mt-green)">R$ '+val+'</span></div>';
+
         el.innerHTML =
-          '<div class="d-head"><div class="d-icon" style="background:var(--mt-green-soft);color:var(--mt-green)">📦</div><div><div class="d-title">Pedidos Hoje</div><div class="d-sub">Vendas do dia</div></div></div>'+
+          '<div class="d-head" onclick="toggleCard(\'alertPedidos\')"><div class="d-icon" style="background:var(--mt-green-soft);color:var(--mt-green)">📦</div><div><div class="d-title">Pedidos Hoje</div><div class="d-sub">Vendas do dia</div></div><div class="d-toggle">'+chevronSvg+'</div></div>'+
           '<div class="d-big" style="color:var(--mt-green)">'+d.total+'</div>'+
-          '<div class="d-rows"><div class="d-row"><span class="d-row-name">Total vendido</span><span class="d-row-n">R$ '+val+'</span></div></div>';
+          '<div class="d-body"><div class="d-rows">'+detalhes+'</div>'+totalRow+'</div>';
+
+        if(wasExpanded) el.classList.add('expanded');
       })
       .catch(function(){ document.getElementById('alertPedidos').innerHTML='<div class="d-empty">Pedidos indisponivel</div>'; });
   }
