@@ -7,7 +7,7 @@
   <link rel="icon" href="https://www.mealtime.com.br/mealtime/logo-avatar-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -17,13 +17,14 @@
       --mt-red-glow: rgba(188,32,38,0.25);
       --mt-green: #5CB85C;
       --mt-green-soft: rgba(92,184,92,0.10);
-      --mt-dark: #111214;
-      --mt-panel: #18191c;
-      --mt-card: #1e2024;
-      --surface: rgba(255,255,255,0.04);
-      --surface-hover: rgba(255,255,255,0.07);
+      --mt-dark: #0c0d0f;
+      --mt-panel: #141518;
+      --mt-card: #1a1b1f;
+      --mt-card-hover: #1f2025;
+      --surface: rgba(255,255,255,0.035);
+      --surface-hover: rgba(255,255,255,0.06);
       --border: rgba(255,255,255,0.06);
-      --border-hover: rgba(255,255,255,0.14);
+      --border-hover: rgba(255,255,255,0.12);
       --text-primary: #f0f0f0;
       --text-secondary: rgba(255,255,255,0.50);
       --text-tertiary: rgba(255,255,255,0.28);
@@ -37,52 +38,51 @@
       --cyan-soft: rgba(34,211,238,0.10);
       --r: 12px;
       --r-sm: 8px;
+      --sidebar-w: 250px;
     }
 
     html, body {
       height: 100%;
-      font-family: "Inter", "Google Sans", system-ui, sans-serif;
+      font-family: "Inter", system-ui, sans-serif;
       color: var(--text-primary);
       background: var(--mt-dark);
       -webkit-font-smoothing: antialiased;
       overflow: hidden;
     }
 
-    /* ═══ COCKPIT 3-COL ═══ */
-    .cockpit {
+    /* ═══ LAYOUT ═══ */
+    .shell {
       display: grid;
-      grid-template-columns: 240px 1fr 300px;
-      grid-template-rows: auto 1fr;
+      grid-template-columns: var(--sidebar-w) 1fr;
       height: 100vh;
     }
 
-    /* ─── TOPBAR ─── */
-    .topbar {
-      grid-column: 1 / -1;
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      background: var(--mt-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sb-logo {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 12px 22px;
-      background: var(--mt-panel);
+      gap: 11px;
+      padding: 18px 18px 16px;
       border-bottom: 1px solid var(--border);
     }
 
-    .topbar-left {
-      display: flex;
-      align-items: center;
-      gap: 12px;
+    .sb-logo img {
+      width: 32px; height: 32px;
+      border-radius: 8px;
     }
 
-    .topbar-logo-img {
-      width: 30px;
-      height: 30px;
-      border-radius: 7px;
-    }
-
-    .topbar-brand {
+    .sb-logo-text {
       font-weight: 800;
-      font-size: 1rem;
-      letter-spacing: 0.08em;
+      font-size: 0.95rem;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
       background: linear-gradient(135deg, var(--mt-red), #e04b4b);
       -webkit-background-clip: text;
@@ -90,560 +90,332 @@
       background-clip: text;
     }
 
-    .topbar-sep {
-      width: 1px;
-      height: 16px;
-      background: var(--border);
+    .sb-nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
-    .topbar-label {
-      font-size: 0.7rem;
+    .sb-section-label {
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
       color: var(--text-tertiary);
-      font-weight: 500;
-      letter-spacing: 0.04em;
+      padding: 0 8px;
+      margin-bottom: -6px;
     }
 
-    .topbar-right {
+    .sb-item {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: var(--r-sm);
+      text-decoration: none;
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      font-weight: 500;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: 1px solid transparent;
     }
 
-    .topbar-clock {
-      font-size: 0.75rem;
+    .sb-item:hover {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+      border-color: var(--border);
+    }
+
+    .sb-item-icon {
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+
+    .sb-item-info { flex: 1; min-width: 0; }
+
+    .sb-item-name {
+      font-weight: 600;
+      font-size: 0.76rem;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sb-item-desc {
+      font-size: 0.6rem;
+      color: var(--text-tertiary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sb-arrow {
+      opacity: 0;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      color: var(--text-tertiary);
+    }
+
+    .sb-item:hover .sb-arrow {
+      opacity: 0.6;
+      transform: translateX(2px);
+    }
+
+    .sb-sub-wrap {
+      padding: 9px 10px;
+      border-radius: var(--r-sm);
+    }
+
+    .sb-sub-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .sb-subs {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding-left: 40px;
+    }
+
+    .sb-sub {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 6px;
+      text-decoration: none;
+      color: var(--text-secondary);
+      font-size: 0.68rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .sb-sub:hover {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+    }
+
+    .sb-sub-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.3;
+      flex-shrink: 0;
+    }
+
+    .sb-pulse {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--mt-green);
+      box-shadow: 0 0 6px rgba(92,184,92,0.5);
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+
+    .sb-footer {
+      border-top: 1px solid var(--border);
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sb-clock {
+      font-size: 0.68rem;
       font-weight: 600;
       color: var(--text-secondary);
       font-variant-numeric: tabular-nums;
     }
 
-    .topbar-pulse {
-      width: 7px; height: 7px;
+    .sb-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.6rem;
+      color: var(--text-tertiary);
+    }
+
+    .sb-status-dot {
+      width: 6px; height: 6px;
       border-radius: 50%;
       background: var(--mt-green);
-      box-shadow: 0 0 8px rgba(92,184,92,0.6);
       animation: pulse 2s ease-in-out infinite;
     }
 
-    @keyframes pulse {
-      0%,100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.85); }
-    }
-
-    /* ─── SIDEBAR LEFT ─── */
-    .side-left {
-      background: var(--mt-panel);
-      border-right: 1px solid var(--border);
-      padding: 20px 14px;
+    /* ─── MAIN DASHBOARD ─── */
+    .main {
       overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
+      padding: 32px 40px;
+      background:
+        radial-gradient(ellipse 50% 35% at 50% -5%, rgba(188,32,38,0.06), transparent),
+        var(--mt-dark);
     }
 
-    .side-label {
-      font-size: 0.6rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text-tertiary);
+    .main-inner {
+      max-width: 900px;
+      margin: 0 auto;
     }
 
-    /* Alert cards */
-    .a-card {
+    .dash-header {
+      margin-bottom: 30px;
+    }
+
+    .dash-greeting {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .dash-date {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* Alert row */
+    .dash-alerts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .d-card {
       background: var(--mt-card);
       border: 1px solid var(--border);
       border-radius: var(--r);
-      padding: 12px 12px;
+      padding: 18px 20px;
       transition: border-color 0.3s;
     }
 
-    .a-card:hover { border-color: var(--border-hover); }
+    .d-card:hover { border-color: var(--border-hover); }
 
-    .a-head {
+    .d-head {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 0;
+      gap: 10px;
+      margin-bottom: 14px;
     }
 
-    .a-icon {
-      width: 26px; height: 26px;
-      border-radius: 7px;
+    .d-icon {
+      width: 34px; height: 34px;
+      border-radius: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.78rem;
+      font-size: 1rem;
     }
 
-    .a-title { font-weight: 700; font-size: 0.72rem; }
-    .a-sub { font-size: 0.58rem; color: var(--text-tertiary); font-weight: 500; }
+    .d-title { font-weight: 700; font-size: 0.82rem; }
+    .d-sub { font-size: 0.64rem; color: var(--text-tertiary); font-weight: 500; }
 
-    .a-big {
-      font-size: 1.5rem;
+    .d-big {
+      font-size: 2.2rem;
       font-weight: 800;
       line-height: 1;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       font-variant-numeric: tabular-nums;
     }
 
-    .a-unit {
-      font-size: 0.65rem;
-      font-weight: 500;
-      color: var(--text-tertiary);
-      margin-left: 3px;
-    }
+    .d-rows { display: flex; flex-direction: column; gap: 4px; }
 
-    .a-rows { display: flex; flex-direction: column; gap: 3px; }
-
-    .a-row {
+    .d-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 5px 8px;
-      border-radius: 5px;
+      padding: 7px 10px;
+      border-radius: 7px;
       background: rgba(255,255,255,0.025);
       transition: background 0.2s;
     }
 
-    .a-row:hover { background: rgba(255,255,255,0.05); }
+    .d-row:hover { background: rgba(255,255,255,0.05); }
 
-    .a-row-name {
-      font-size: 0.64rem;
+    .d-row-name {
+      font-size: 0.72rem;
       font-weight: 500;
       color: var(--text-secondary);
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
     }
 
-    .a-dot {
+    .d-dot {
       width: 5px; height: 5px;
       border-radius: 50%;
       flex-shrink: 0;
     }
 
-    .a-row-n {
-      font-size: 0.72rem;
+    .d-row-n {
+      font-size: 0.78rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
     }
 
-    .a-empty {
-      font-size: 0.7rem;
+    .d-empty {
+      font-size: 0.74rem;
       color: var(--text-tertiary);
       text-align: center;
-      padding: 10px;
+      padding: 14px;
     }
 
-    .a-load {
+    .d-load {
       text-align: center;
-      padding: 20px 10px;
+      padding: 24px 10px;
       color: var(--text-tertiary);
-      font-size: 0.7rem;
+      font-size: 0.74rem;
     }
 
-    .a-valor {
-      font-size: 0.62rem;
-      color: var(--text-tertiary);
-      margin-top: -4px;
-    }
-
-    /* Number badge — hidden when collapsed */
-    .a-num {
-      margin-left: auto;
-      font-size: 1.1rem;
-      font-weight: 800;
-      color: var(--text-primary);
-      opacity: 0;
-      transform: scale(0.7);
-      transition: opacity 0.3s cubic-bezier(.4,0,.2,1), transform 0.3s cubic-bezier(.4,0,.2,1);
-    }
-
-    .a-card.open .a-num {
-      opacity: 1;
-      transform: scale(1);
-    }
-
-    /* Collapsible body */
-    .a-body {
-      overflow: hidden;
-      max-height: 0;
-      transition: max-height 0.3s cubic-bezier(.4,0,.2,1);
-    }
-
-    .a-card.open .a-body {
-      max-height: 300px;
-    }
-
-    .a-toggle {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4px 0 0;
-      cursor: pointer;
-      border: none;
-      background: none;
-      width: 100%;
-    }
-
-    .a-toggle svg {
-      width: 14px;
-      height: 14px;
-      color: var(--text-tertiary);
-      transition: transform 0.3s cubic-bezier(.4,0,.2,1);
-    }
-
-    .a-card.open .a-toggle svg {
-      transform: rotate(180deg);
-    }
-
-    .a-toggle:hover svg {
-      color: var(--text-secondary);
-    }
-
-    /* ─── CENTER ─── */
-    .center {
-      padding: 28px 36px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background:
-        radial-gradient(ellipse 60% 45% at 50% -5%, var(--mt-red-soft), transparent),
-        var(--mt-dark);
-    }
-
-    .center-wrap { width: 100%; max-width: 780px; }
-
-    .center-sub {
-      text-align: center;
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      margin-bottom: 28px;
-      font-weight: 500;
-    }
-
-    /* App grid */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 14px;
-    }
-
-    .app {
+    /* Newsletter section */
+    .dash-nl {
       background: var(--mt-card);
       border: 1px solid var(--border);
       border-radius: var(--r);
-      padding: 22px 18px;
-      text-decoration: none;
-      color: var(--text-primary);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      cursor: pointer;
-      transition: all 0.25s cubic-bezier(.4,0,.2,1);
-      animation: fadeUp 0.4s cubic-bezier(.4,0,.2,1) both;
+      padding: 22px 24px;
+      margin-bottom: 24px;
     }
 
-    .app:nth-child(1){animation-delay:.03s}
-    .app:nth-child(2){animation-delay:.06s}
-    .app:nth-child(3){animation-delay:.09s}
-    .app:nth-child(4){animation-delay:.12s}
-    .app:nth-child(5){animation-delay:.15s}
-
-    .app:hover {
-      border-color: var(--border-hover);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px var(--border-hover);
-    }
-
-    .app-top {
+    .nl-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      margin-bottom: 16px;
     }
 
-    .app-icon {
-      width: 42px; height: 42px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-    }
-
-    .app-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--mt-green);
-      box-shadow: 0 0 6px rgba(92,184,92,0.5);
-    }
-
-    .app-name { font-weight: 700; font-size: 0.92rem; }
-    .app-desc { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5; }
-
-    .app-go {
-      margin-top: auto;
-      padding-top: 6px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      color: var(--mt-red);
-      opacity: 0.5;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      transition: opacity 0.2s;
-    }
-
-    .app:hover .app-go { opacity: 1; }
-    .app:hover .app-go svg { transform: translateX(3px); }
-    .app-go svg { width: 10px; height: 10px; transition: transform 0.2s; }
-
-    .i-crm   { background: var(--mt-red-soft); color: #e85d5d; }
-    .i-bi    { background: var(--amber-soft); color: #fb923c; }
-    .i-dietas{ background: var(--mt-green-soft); color: #6dcf6d; }
-    .i-ecom  { background: var(--purple-soft); color: var(--purple); }
-    .i-fin   { background: var(--blue-soft); color: #60a5fa; }
-    .i-meta  { background: var(--cyan-soft); color: var(--cyan); }
-    .i-mkt   { background: rgba(250,204,21,0.10); color: #facc15; }
-    .i-estoque { background: rgba(251,146,60,0.10); color: #fb923c; }
-
-    /* Seções de categoria */
-    .section-block { margin-bottom: 22px; }
-    .section-header {
+    .nl-header-left {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 12px;
-      padding: 0 2px;
-    }
-    .section-icon {
-      width: 28px; height: 28px;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.9rem;
-      flex-shrink: 0;
-    }
-    .section-icon.si-lojas  { background: rgba(168,85,247,0.12); color: #a855f7; }
-    .section-icon.si-fabrica { background: rgba(251,191,36,0.12); color: #fbbf24; }
-    .section-icon.si-bi      { background: rgba(96,165,250,0.12); color: #60a5fa; }
-    .section-title-text {
-      font-size: 0.72rem;
-      font-weight: 800;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-    }
-    .section-line {
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-    .app.coming-soon {
-      opacity: 0.4;
-      pointer-events: none;
-      cursor: default;
-    }
-    .app.coming-soon .app-go { display: none; }
-    .coming-badge {
-      font-size: 0.6rem;
-      font-weight: 700;
-      color: var(--text-secondary);
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border);
-      padding: 2px 8px;
-      border-radius: 20px;
-      margin-top: auto;
-      text-align: center;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    /* Sublinks */
-    .subs { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
-
-    .sub {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 8px;
-      background: rgba(255,255,255,0.025);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-radius: 6px;
-      color: var(--text-primary);
-      text-decoration: none;
-      font-size: 0.68rem;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-
-    .sub:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.1); }
-    .sub .sd { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.3; }
-    .sub .sa { margin-left: auto; opacity: 0.25; transition: all 0.2s; }
-    .sub:hover .sa { transform: translateX(2px); opacity: 0.5; }
-
-    /* Versículo — discreto */
-    .verse-section {
-      margin-top: 28px;
-      text-align: center;
-      padding: 12px 16px;
-      animation: fadeUp 0.5s cubic-bezier(.4,0,.2,1) 0.22s both;
-    }
-
-    .verse-text {
-      font-family: "Google Sans", "Inter", serif;
-      font-size: 0.76rem;
-      font-style: italic;
-      font-weight: 400;
-      line-height: 1.6;
-      color: var(--text-tertiary);
-      max-width: 500px;
-      margin: 0 auto 6px;
-    }
-
-    .verse-ref {
-      font-size: 0.65rem;
-      font-weight: 500;
-      color: var(--mt-red);
-      opacity: 0.45;
-      letter-spacing: 0.03em;
-    }
-
-    .footer {
-      text-align: center;
-      margin-top: 20px;
-      color: var(--text-tertiary);
-      font-size: 0.62rem;
-      letter-spacing: 0.08em;
-    }
-
-    /* ─── SIDEBAR RIGHT ─── */
-    .side-right {
-      background: var(--mt-panel);
-      border-left: 1px solid var(--border);
-      padding: 18px 14px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .nl-head {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      margin-bottom: 4px;
     }
 
     .nl-icon {
-      width: 28px; height: 28px;
-      border-radius: 7px;
+      width: 34px; height: 34px;
+      border-radius: 9px;
       background: var(--mt-red-soft);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.85rem;
+      font-size: 1rem;
     }
 
-    .nl-label {
-      font-weight: 800;
-      font-size: 0.7rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    .nl-date {
-      font-size: 0.62rem;
-      color: var(--text-tertiary);
-      margin-bottom: 14px;
-    }
-
-    .nl-items { display: flex; flex-direction: column; gap: 3px; }
-
-    .nl-item {
-      display: flex;
-      gap: 9px;
-      align-items: flex-start;
-      padding: 11px 9px;
-      border-radius: var(--r-sm);
-      transition: background 0.2s;
-      cursor: pointer;
-      text-decoration: none;
-      color: inherit;
-    }
-
-    .nl-item:hover { background: var(--surface-hover); }
-
-    .nl-n {
-      flex-shrink: 0;
-      width: 20px; height: 20px;
-      border-radius: 5px;
-      background: var(--mt-red-soft);
-      color: var(--mt-red);
-      font-weight: 800;
-      font-size: 0.6rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 1px;
-    }
-
-    .nl-c { flex: 1; min-width: 0; }
-
-    .nl-t {
-      font-size: 0.72rem;
-      font-weight: 600;
-      line-height: 1.45;
-      margin-bottom: 3px;
-    }
-
-    .nl-s {
-      font-size: 0.66rem;
-      line-height: 1.5;
-      color: var(--text-secondary);
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .nl-more {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      font-size: 0.6rem;
-      font-weight: 600;
-      color: var(--mt-red);
-      opacity: 0;
-      margin-top: 4px;
-      transition: opacity 0.2s;
-    }
-
-    .nl-item:hover .nl-more { opacity: 0.7; }
-
-    .nl-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      margin-top: 12px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
-    }
-
-    .nl-tag {
-      padding: 2px 7px;
-      border-radius: 20px;
-      font-size: 0.58rem;
-      font-weight: 600;
-      background: rgba(255,255,255,0.03);
-      color: var(--text-secondary);
-      border: 1px solid rgba(255,255,255,0.05);
-    }
-
-    .nl-foot { margin-top: 10px; text-align: right; }
+    .nl-title { font-weight: 700; font-size: 0.82rem; }
+    .nl-date-label { font-size: 0.64rem; color: var(--text-tertiary); }
 
     .nl-link {
-      font-size: 0.62rem;
+      font-size: 0.68rem;
       font-weight: 600;
       color: var(--mt-red);
       text-decoration: none;
@@ -656,44 +428,156 @@
 
     .nl-link:hover { opacity: 1; }
 
+    .nl-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .nl-card {
+      padding: 14px 16px;
+      border-radius: var(--r-sm);
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.04);
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .nl-card:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: var(--border-hover);
+    }
+
+    .nl-card-n {
+      width: 22px; height: 22px;
+      border-radius: 6px;
+      background: var(--mt-red-soft);
+      color: var(--mt-red);
+      font-weight: 800;
+      font-size: 0.62rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nl-card-title {
+      font-size: 0.76rem;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+
+    .nl-card-desc {
+      font-size: 0.68rem;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .nl-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .nl-tag {
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 0.6rem;
+      font-weight: 600;
+      background: rgba(255,255,255,0.03);
+      color: var(--text-secondary);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
     .nl-load {
       text-align: center;
       padding: 28px;
       color: var(--text-tertiary);
-      font-size: 0.7rem;
+      font-size: 0.74rem;
     }
 
-    /* ─── ANIM ─── */
+    /* Verse */
+    .dash-verse {
+      text-align: center;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .verse-text {
+      font-size: 0.82rem;
+      font-style: italic;
+      font-weight: 400;
+      line-height: 1.7;
+      color: var(--text-tertiary);
+      max-width: 550px;
+      margin: 0 auto 6px;
+    }
+
+    .verse-ref {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--mt-red);
+      opacity: 0.4;
+      letter-spacing: 0.03em;
+    }
+
+    .dash-footer {
+      text-align: center;
+      color: var(--text-tertiary);
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+    }
+
+    /* Icon color classes */
+    .i-crm    { background: var(--mt-red-soft); color: #e85d5d; }
+    .i-bi     { background: var(--amber-soft); color: #fb923c; }
+    .i-dietas { background: var(--mt-green-soft); color: #6dcf6d; }
+    .i-ecom   { background: var(--purple-soft); color: var(--purple); }
+    .i-fin    { background: var(--blue-soft); color: #60a5fa; }
+    .i-meta   { background: var(--cyan-soft); color: var(--cyan); }
+    .i-mkt    { background: rgba(250,204,21,0.10); color: #facc15; }
+    .i-estoque{ background: rgba(251,146,60,0.10); color: #fb923c; }
+
+    /* Animations */
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ─── RESPONSIVE ─── */
-    @media (max-width: 1100px) {
-      .cockpit {
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .anim { animation: fadeUp 0.4s cubic-bezier(.4,0,.2,1) both; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .shell {
         grid-template-columns: 1fr;
-        grid-template-rows: auto auto 1fr auto;
-        overflow-y: auto;
+        grid-template-rows: auto 1fr;
       }
-      html, body { overflow: auto; }
-      .side-left {
+      .sidebar {
         border-right: none;
         border-bottom: 1px solid var(--border);
-        flex-direction: row;
-        flex-wrap: wrap;
+        max-height: 50vh;
       }
-      .side-left .side-label { width: 100%; }
-      .side-left .a-card { flex: 1; min-width: 200px; }
-      .side-right { border-left: none; border-top: 1px solid var(--border); }
-      .center { padding: 22px 18px; }
+      .main { padding: 24px 18px; }
+      .dash-alerts { grid-template-columns: 1fr; }
+      .nl-grid { grid-template-columns: 1fr; }
     }
 
-    @media (max-width: 600px) {
-      .grid { grid-template-columns: 1fr 1fr; gap: 9px; }
-    }
-
-    /* scrollbar sutil */
+    /* Scrollbar */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
@@ -701,208 +585,168 @@
 </head>
 <body>
 
-<div class="cockpit">
+<div class="shell">
 
-  <!-- TOPBAR -->
-  <div class="topbar">
-    <div class="topbar-left">
-      <img src="https://www.mealtime.com.br/mealtime/logo-avatar-192.png" alt="Meal Time" class="topbar-logo-img">
-      <span class="topbar-brand">Meal Time</span>
-      <span class="topbar-sep"></span>
-      <span class="topbar-label">Painel de Controle</span>
+  <!-- SIDEBAR MENU -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <img src="https://www.mealtime.com.br/mealtime/logo-avatar-192.png" alt="Meal Time">
+      <span class="sb-logo-text">Meal Time</span>
     </div>
-    <div class="topbar-right">
-      <span class="topbar-clock" id="clock"></span>
-      <span class="topbar-pulse"></span>
-    </div>
-  </div>
 
-  <!-- SIDEBAR ESQUERDA -->
-  <div class="side-left">
-    <div class="side-label">Alertas do dia</div>
-    <div class="a-card" id="alertContas">
-      <div class="a-load">Carregando contas...</div>
-    </div>
-    <div class="a-card" id="alertPedidos">
-      <div class="a-load">Carregando pedidos...</div>
-    </div>
-  </div>
+    <nav class="sb-nav" id="sidebar-nav"></nav>
 
-  <!-- CENTRO -->
-  <div class="center">
-    <div class="center-wrap">
-      <div class="center-sub">Selecione o sistema</div>
-      <div class="grid" id="grid"></div>
+    <div class="sb-footer">
+      <span class="sb-clock" id="clock"></span>
+      <div class="sb-status">
+        <span class="sb-status-dot"></span>
+        Online
+      </div>
+    </div>
+  </aside>
 
-      <div class="verse-section" id="verse">
+  <!-- MAIN DASHBOARD -->
+  <main class="main">
+    <div class="main-inner">
+
+      <div class="dash-header anim">
+        <div class="dash-greeting" id="greeting"></div>
+        <div class="dash-date" id="dateLabel"></div>
+      </div>
+
+      <div class="dash-alerts">
+        <div class="d-card anim" id="alertContas" style="animation-delay:.05s">
+          <div class="d-load">Carregando contas...</div>
+        </div>
+        <div class="d-card anim" id="alertPedidos" style="animation-delay:.1s">
+          <div class="d-load">Carregando pedidos...</div>
+        </div>
+      </div>
+
+      <div class="dash-nl anim" id="newsletter" style="animation-delay:.15s">
+        <div class="nl-load">Carregando newsletter...</div>
+      </div>
+
+      <div class="dash-verse anim" style="animation-delay:.2s">
         <div class="verse-text" id="verseText"></div>
         <div class="verse-ref" id="verseRef"></div>
       </div>
 
-      <div class="footer">Meal Time &copy; 2026</div>
-    </div>
-  </div>
+      <div class="dash-footer anim" style="animation-delay:.25s">Meal Time &copy; 2026</div>
 
-  <!-- SIDEBAR DIREITA -->
-  <div class="side-right" id="newsletter">
-    <div class="nl-load">Carregando newsletter...</div>
-  </div>
+    </div>
+  </main>
 
 </div>
 
 <script>
-  /* ═══ RELÓGIO ═══ */
+  var ar = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
+
+  /* ═══ GREETING + DATE ═══ */
+  (function(){
+    var h = new Date().getHours();
+    var g = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+    document.getElementById('greeting').textContent = g + ', Talison';
+
+    var n = new Date();
+    var dias = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sabado'];
+    var meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    document.getElementById('dateLabel').textContent =
+      dias[n.getDay()] + ', ' + n.getDate() + ' de ' + meses[n.getMonth()] + ' de ' + n.getFullYear();
+  })();
+
+  /* ═══ CLOCK ═══ */
   (function(){
     var el = document.getElementById('clock');
     function t(){
       var n = new Date();
-      var d = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'][n.getDay()];
-      var dd = String(n.getDate()).padStart(2,'0');
-      var mm = String(n.getMonth()+1).padStart(2,'0');
       var hh = String(n.getHours()).padStart(2,'0');
       var mi = String(n.getMinutes()).padStart(2,'0');
-      el.textContent = d+' '+dd+'/'+mm+'  '+hh+':'+mi;
+      el.textContent = hh + ':' + mi;
     }
     t(); setInterval(t, 30000);
   })();
 
-  /* ═══ APPS POR SEÇÃO ═══ */
+  /* ═══ SIDEBAR MENU ═══ */
   var SECTIONS = [
     {
       title: 'Canal de Vendas',
-      icon: '🛍️',
-      iconClass: 'si-lojas',
       apps: [
-        { id:'meta', title:'Meta Ads', desc:'Campanhas e performance.', icon:'📢', ic:'i-meta',
+        { id:'meta', title:'Meta Ads', desc:'Campanhas', icon:'📢', ic:'i-meta',
           url:'https://meta-ads-dashboard-production-1f44.up.railway.app' },
-        { id:'ecom', title:'E-commerce', desc:'Prefiro Delivery.', icon:'🛒', ic:'i-ecom', url:null,
+        { id:'ecom', title:'E-commerce', desc:'Prefiro Delivery', icon:'🛒', ic:'i-ecom', url:null,
           subs:[
             {l:'Pelotas', u:'https://painel.prefirodelivery.com/pelotas_mealtime'},
             {l:'Santa Maria', u:'https://painel.prefirodelivery.com/santamaria_mealtime'}
           ]},
-        { id:'crm', title:'CRM', desc:'Clientes e recompra.', icon:'👥', ic:'i-crm',
+        { id:'crm', title:'CRM', desc:'Clientes e recompra', icon:'👥', ic:'i-crm',
           url:'https://meal-time-crm-production.up.railway.app/' },
-        { id:'mkt', title:'MKT — Marketing', desc:'Conteúdo e orgânico.', icon:'📋', ic:'i-mkt',
+        { id:'mkt', title:'MKT Marketing', desc:'Conteudo e organico', icon:'📋', ic:'i-mkt',
           url:'https://marketing-hub-mealtime-production.up.railway.app' }
       ]
     },
     {
-      title: 'Produção',
-      icon: '🏭',
-      iconClass: 'si-fabrica',
+      title: 'Producao',
       apps: [
-        { id:'estoque', title:'Estoque Fábrica', desc:'Inventário e produção.', icon:'📦', ic:'i-estoque',
+        { id:'estoque', title:'Estoque Fabrica', desc:'Inventario e producao', icon:'📦', ic:'i-estoque',
           url:'https://estoque-fabrica-mealtime-production.up.railway.app' },
-        { id:'dietas', title:'Gerador de Pedidos', desc:'Personalizados e B2B.', icon:'🥗', ic:'i-dietas',
+        { id:'dietas', title:'Gerador de Pedidos', desc:'Personalizados e B2B', icon:'🥗', ic:'i-dietas',
           url:'https://charismatic-friendship-production-b81d.up.railway.app/' },
-        { id:'fin', title:'Financeiro / ERP', desc:'Bling — contas e NFs.', icon:'💰', ic:'i-fin',
+        { id:'fin', title:'Financeiro / ERP', desc:'Bling — contas e NFs', icon:'💰', ic:'i-fin',
           url:'https://www.bling.com.br/inicio#/' }
       ]
     },
     {
-      title: 'Dados & Inteligência',
-      icon: '📊',
-      iconClass: 'si-bi',
+      title: 'Dados & Inteligencia',
       apps: [
-        { id:'bi', title:'BI — Inteligência de Negócio', desc:'Fábrica, lojas e performance.', icon:'📊', ic:'i-bi',
+        { id:'bi', title:'BI Inteligencia', desc:'Fabrica, lojas e KPIs', icon:'📊', ic:'i-bi',
           url:'https://bi-bling-production.up.railway.app/bi.html#vendas' }
       ]
     }
   ];
 
-  var g = document.getElementById('grid');
-  var ar = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
-
-  SECTIONS.forEach(function(sec){
-    var block = document.createElement('div');
-    block.className = 'section-block';
-    block.innerHTML = '<div class="section-header"><div class="section-icon '+sec.iconClass+'">'+sec.icon+'</div><span class="section-title-text">'+sec.title+'</span><div class="section-line"></div></div>';
-
-    var gridDiv = document.createElement('div');
-    gridDiv.className = 'grid';
-
-    sec.apps.forEach(function(a){
-      var hs = a.subs && a.subs.length;
-      var c = document.createElement(hs ? 'div' : 'a');
-      c.className = 'app' + (a.comingSoon ? ' coming-soon' : '');
-      if(!hs && !a.comingSoon){
-        c.href = a.url || '#';
-        c.target = '_blank';
-        c.rel = 'noopener';
-        if(!a.url) c.addEventListener('click', function(e){ e.preventDefault(); });
-      }
-      var h = '<div class="app-top"><div class="app-icon '+a.ic+'">'+a.icon+'</div>'+(a.comingSoon?'':'<div class="app-dot"></div>')+'</div>'+
-        '<div class="app-name">'+a.title+'</div><div class="app-desc">'+a.desc+'</div>';
-      if(a.comingSoon){
-        h += '<div class="coming-badge">Em breve</div>';
-      } else if(hs){
-        h += '<div class="subs">';
-        a.subs.forEach(function(s){
-          h += '<a class="sub" href="'+s.u+'" target="_blank" rel="noopener"><span class="sd"></span>'+s.l+'<span class="sa">'+ar+'</span></a>';
-        });
-        h += '</div>';
-      } else {
-        h += '<div class="app-go">Acessar '+ar+'</div>';
-      }
-      c.innerHTML = h;
-      gridDiv.appendChild(c);
-    });
-
-    block.appendChild(gridDiv);
-    g.appendChild(block);
-  });
-
-  /* ═══ VERSÍCULO DO DIA ═══ */
-  var VERSES = [
-    { t: 'Porque eu bem sei os pensamentos que penso de vós, diz o Senhor; pensamentos de paz e não de mal, para vos dar o fim que esperais.', r: 'Jeremias 29:11' },
-    { t: 'Tudo posso naquele que me fortalece.', r: 'Filipenses 4:13' },
-    { t: 'Confia no Senhor de todo o teu coração e não te estribes no teu próprio entendimento.', r: 'Provérbios 3:5' },
-    { t: 'O Senhor é o meu pastor; nada me faltará.', r: 'Salmos 23:1' },
-    { t: 'Mas os que esperam no Senhor renovarão as suas forças; subirão com asas como águias.', r: 'Isaías 40:31' },
-    { t: 'Entrega o teu caminho ao Senhor; confia nele, e ele tudo fará.', r: 'Salmos 37:5' },
-    { t: 'Não temas, porque eu sou contigo; não te assombres, porque eu sou teu Deus.', r: 'Isaías 41:10' },
-    { t: 'Sede fortes e corajosos. Não temais, nem vos assusteis, pois o Senhor, o seu Deus, vai com vocês; nunca os deixará, nunca os abandonará.', r: 'Deuteronômio 31:6' },
-    { t: 'Deleita-te também no Senhor, e ele te concederá o que deseja o teu coração.', r: 'Salmos 37:4' },
-    { t: 'E sabemos que todas as coisas contribuem juntamente para o bem daqueles que amam a Deus.', r: 'Romanos 8:28' },
-    { t: 'Bem-aventurado o homem que confia no Senhor, e cuja esperança é o Senhor.', r: 'Jeremias 17:7' },
-    { t: 'Pois onde estiver o vosso tesouro, aí estará também o vosso coração.', r: 'Mateus 6:21' },
-    { t: 'Alegrai-vos sempre no Senhor; outra vez digo: alegrai-vos.', r: 'Filipenses 4:4' },
-    { t: 'O Senhor é a minha luz e a minha salvação; a quem temerei?', r: 'Salmos 27:1' },
-    { t: 'Lança o teu pão sobre as águas, porque depois de muitos dias o acharás.', r: 'Eclesiastes 11:1' },
-    { t: 'Porque pela graça sois salvos, por meio da fé; e isso não vem de vós; é dom de Deus.', r: 'Efésios 2:8' },
-    { t: 'A vossa gentileza seja conhecida de todos os homens. Perto está o Senhor.', r: 'Filipenses 4:5' },
-    { t: 'O coração do homem planeja o seu caminho, mas o Senhor lhe dirige os passos.', r: 'Provérbios 16:9' },
-    { t: 'Em todo o tempo ama o amigo; e na angústia nasce o irmão.', r: 'Provérbios 17:17' },
-    { t: 'Buscai primeiro o Reino de Deus e a sua justiça, e todas essas coisas vos serão acrescentadas.', r: 'Mateus 6:33' },
-    { t: 'Porque o Senhor dá a sabedoria; da sua boca vem o conhecimento e o entendimento.', r: 'Provérbios 2:6' },
-    { t: 'O Senhor abençoe e te guarde; o Senhor faça resplandecer o seu rosto sobre ti e tenha misericórdia de ti.', r: 'Números 6:24-25' },
-    { t: 'Eu sou a videira, vós, as varas; quem está em mim, e eu nele, este dá muito fruto.', r: 'João 15:5' },
-    { t: 'Não vos inquieteis por coisa alguma; antes, as vossas petições sejam em tudo conhecidas diante de Deus.', r: 'Filipenses 4:6' },
-    { t: 'Esforçai-vos, e ele fortalecerá o vosso coração, vós todos que esperais no Senhor.', r: 'Salmos 31:24' },
-    { t: 'Se Deus é por nós, quem será contra nós?', r: 'Romanos 8:31' },
-    { t: 'Toda boa dádiva e todo dom perfeito vêm do alto, descendo do Pai das luzes.', r: 'Tiago 1:17' },
-    { t: 'Cria em mim, ó Deus, um coração puro e renova em mim um espírito reto.', r: 'Salmos 51:10' },
-    { t: 'O fruto do Espírito é: amor, alegria, paz, paciência, amabilidade, bondade, fidelidade, mansidão e domínio próprio.', r: 'Gálatas 5:22-23' },
-    { t: 'O justo viverá pela fé.', r: 'Romanos 1:17' },
-    { t: 'Clama a mim, e responder-te-ei, e anunciar-te-ei coisas grandes e firmes, que não sabes.', r: 'Jeremias 33:3' }
-  ];
-
   (function(){
-    var now = new Date();
-    var start = new Date(now.getFullYear(), 0, 0);
-    var dayOfYear = Math.floor((now - start) / 86400000);
-    var v = VERSES[dayOfYear % VERSES.length];
-    document.getElementById('verseText').textContent = '\u201C' + v.t + '\u201D';
-    document.getElementById('verseRef').textContent = v.r;
+    var nav = document.getElementById('sidebar-nav');
+
+    SECTIONS.forEach(function(sec){
+      var label = document.createElement('div');
+      label.className = 'sb-section-label';
+      label.textContent = sec.title;
+      nav.appendChild(label);
+
+      sec.apps.forEach(function(a){
+        if(a.subs && a.subs.length){
+          var wrap = document.createElement('div');
+          wrap.className = 'sb-sub-wrap';
+          wrap.innerHTML =
+            '<div class="sb-sub-head">'+
+              '<div class="sb-item-icon '+a.ic+'">'+a.icon+'</div>'+
+              '<div class="sb-item-info"><div class="sb-item-name">'+a.title+'</div><div class="sb-item-desc">'+a.desc+'</div></div>'+
+            '</div>';
+
+          var subsDiv = document.createElement('div');
+          subsDiv.className = 'sb-subs';
+          a.subs.forEach(function(s){
+            subsDiv.innerHTML += '<a class="sb-sub" href="'+s.u+'" target="_blank" rel="noopener"><span class="sb-sub-dot"></span>'+s.l+'</a>';
+          });
+          wrap.appendChild(subsDiv);
+          nav.appendChild(wrap);
+        } else {
+          var item = document.createElement('a');
+          item.className = 'sb-item';
+          item.href = a.url || '#';
+          item.target = '_blank';
+          item.rel = 'noopener';
+          item.innerHTML =
+            '<div class="sb-item-icon '+a.ic+'">'+a.icon+'</div>'+
+            '<div class="sb-item-info"><div class="sb-item-name">'+a.title+'</div><div class="sb-item-desc">'+a.desc+'</div></div>'+
+            '<div class="sb-pulse"></div>'+
+            '<div class="sb-arrow">'+ar+'</div>';
+          nav.appendChild(item);
+        }
+      });
+    });
   })();
-
-  /* ═══ TOGGLE HELPER ═══ */
-  var chevronSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
-
-  function toggleCard(cardId) {
-    var card = document.getElementById(cardId);
-    card.classList.toggle('open');
-  }
 
   /* ═══ CONTAS A PAGAR ═══ */
   function renderContas(){
@@ -910,23 +754,23 @@
       .then(function(r){ return r.json(); })
       .then(function(d){
         var el = document.getElementById('alertContas');
-        if(d.error){ el.innerHTML='<div class="a-empty">Sem dados</div>'; return; }
+        if(d.error){ el.innerHTML='<div class="d-empty">Sem dados</div>'; return; }
 
         var bk='', contas=d.porConta||{}, nomes=Object.keys(contas).sort();
         var cores=['#e85d5d','#a78bfa','#60a5fa','#6dcf6d'];
 
         nomes.forEach(function(n,i){
-          bk += '<div class="a-row"><span class="a-row-name"><span class="a-dot" style="background:'+cores[i%4]+'"></span>'+n+'</span><span class="a-row-n">'+contas[n]+'</span></div>';
+          bk += '<div class="d-row"><span class="d-row-name"><span class="d-dot" style="background:'+cores[i%4]+'"></span>'+n+'</span><span class="d-row-n">'+contas[n]+'</span></div>';
         });
 
-        if(!nomes.length) bk='<div class="a-empty" style="color:var(--mt-green)">Nenhuma conta hoje</div>';
+        if(!nomes.length) bk='<div class="d-empty" style="color:var(--mt-green)">Nenhuma conta hoje</div>';
 
         el.innerHTML =
-          '<div class="a-head"><div class="a-icon" style="background:var(--mt-red-soft);color:var(--mt-red)">\u{1F4CB}</div><div><div class="a-title">Contas a Pagar</div><div class="a-sub">Vencimento hoje</div></div><div class="a-num">'+d.total+'</div></div>'+
-          '<div class="a-body"><div class="a-rows" style="margin-top:8px">'+bk+'</div></div>'+
-          '<button class="a-toggle" onclick="toggleCard(\'alertContas\')">'+chevronSvg+'</button>';
+          '<div class="d-head"><div class="d-icon" style="background:var(--mt-red-soft);color:var(--mt-red)">📋</div><div><div class="d-title">Contas a Pagar</div><div class="d-sub">Vencimento hoje</div></div></div>'+
+          '<div class="d-big" style="color:var(--mt-red)">'+d.total+'</div>'+
+          '<div class="d-rows">'+bk+'</div>';
       })
-      .catch(function(){ document.getElementById('alertContas').innerHTML='<div class="a-empty">Contas indisponível</div>'; });
+      .catch(function(){ document.getElementById('alertContas').innerHTML='<div class="d-empty">Contas indisponivel</div>'; });
   }
 
   /* ═══ PEDIDOS DO DIA ═══ */
@@ -935,15 +779,16 @@
       .then(function(r){ return r.json(); })
       .then(function(d){
         var el = document.getElementById('alertPedidos');
-        if(d.error){ el.innerHTML='<div class="a-empty">Sem dados</div>'; return; }
-        var val = d.valor ? ' <span style="font-size:0.58rem;color:var(--text-tertiary);font-weight:400">R$ '+d.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>' : '';
+        if(d.error){ el.innerHTML='<div class="d-empty">Sem dados</div>'; return; }
+
+        var val = (d.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
 
         el.innerHTML =
-          '<div class="a-head"><div class="a-icon" style="background:var(--mt-green-soft);color:var(--mt-green)">\u{1F4E6}</div><div><div class="a-title">Pedidos Hoje</div><div class="a-sub">Vendas do dia</div></div><div class="a-num">'+d.total+'</div></div>'+
-          '<div class="a-body"><div style="margin-top:8px"><div class="a-row"><span class="a-row-name">Total vendido</span><span class="a-row-n" style="font-size:0.68rem">R$ '+(d.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span></div></div></div>'+
-          '<button class="a-toggle" onclick="toggleCard(\'alertPedidos\')">'+chevronSvg+'</button>';
+          '<div class="d-head"><div class="d-icon" style="background:var(--mt-green-soft);color:var(--mt-green)">📦</div><div><div class="d-title">Pedidos Hoje</div><div class="d-sub">Vendas do dia</div></div></div>'+
+          '<div class="d-big" style="color:var(--mt-green)">'+d.total+'</div>'+
+          '<div class="d-rows"><div class="d-row"><span class="d-row-name">Total vendido</span><span class="d-row-n">R$ '+val+'</span></div></div>';
       })
-      .catch(function(){ document.getElementById('alertPedidos').innerHTML='<div class="a-empty">Pedidos indisponível</div>'; });
+      .catch(function(){ document.getElementById('alertPedidos').innerHTML='<div class="d-empty">Pedidos indisponivel</div>'; });
   }
 
   /* ═══ NEWSLETTER ═══ */
@@ -967,13 +812,12 @@
           df=ds[dt.getDay()]+', '+dt.getDate()+' de '+ms[dt.getMonth()]+' de '+dt.getFullYear();
         }
 
-        var hh='';
+        var cards='';
         items.forEach(function(it,i){
-          var rs=it.s?'<div class="nl-s">'+it.s+'</div>':'';
-          hh+='<a class="nl-item" href="'+url+'" target="_blank" rel="noopener">'+
-            '<div class="nl-n">'+(i+1)+'</div>'+
-            '<div class="nl-c"><div class="nl-t">'+it.m+'</div>'+rs+
-            '<div class="nl-more">Ler matéria '+ar+'</div></div></a>';
+          var desc=it.s?'<div class="nl-card-desc">'+it.s+'</div>':'';
+          cards+='<a class="nl-card" href="'+url+'" target="_blank" rel="noopener">'+
+            '<div class="nl-card-n">'+(i+1)+'</div>'+
+            '<div class="nl-card-title">'+it.m+'</div>'+desc+'</a>';
         });
 
         var tg='';
@@ -985,16 +829,46 @@
 
         var ft='';
         if(d.notionUrl){
-          ft='<div class="nl-foot"><a class="nl-link" href="'+d.notionUrl+'" target="_blank" rel="noopener">Ler completa '+ar+'</a></div>';
+          ft='<a class="nl-link" href="'+d.notionUrl+'" target="_blank" rel="noopener">Ler completa '+ar+'</a>';
         }
 
         el.innerHTML=
-          '<div class="nl-head"><div class="nl-icon">\u{1F4F0}</div><span class="nl-label">Newsletter</span></div>'+
-          '<div class="nl-date">'+df+'</div>'+
-          '<div class="nl-items">'+hh+'</div>'+tg+ft;
+          '<div class="nl-header"><div class="nl-header-left"><div class="nl-icon">📰</div><div><div class="nl-title">Newsletter</div><div class="nl-date-label">'+df+'</div></div></div>'+ft+'</div>'+
+          '<div class="nl-grid">'+cards+'</div>'+tg;
       })
-      .catch(function(){ el.innerHTML='<div class="nl-load">Newsletter indisponível</div>'; });
+      .catch(function(){ el.innerHTML='<div class="nl-load">Newsletter indisponivel</div>'; });
   }
+
+  /* ═══ VERSICULO DO DIA ═══ */
+  var VERSES = [
+    { t: 'Porque eu bem sei os pensamentos que penso de vos, diz o Senhor; pensamentos de paz e nao de mal, para vos dar o fim que esperais.', r: 'Jeremias 29:11' },
+    { t: 'Tudo posso naquele que me fortalece.', r: 'Filipenses 4:13' },
+    { t: 'Confia no Senhor de todo o teu coracao e nao te estribes no teu proprio entendimento.', r: 'Proverbios 3:5' },
+    { t: 'O Senhor e o meu pastor; nada me faltara.', r: 'Salmos 23:1' },
+    { t: 'Mas os que esperam no Senhor renovarao as suas forcas; subirao com asas como aguias.', r: 'Isaias 40:31' },
+    { t: 'Entrega o teu caminho ao Senhor; confia nele, e ele tudo fara.', r: 'Salmos 37:5' },
+    { t: 'Nao temas, porque eu sou contigo; nao te assombres, porque eu sou teu Deus.', r: 'Isaias 41:10' },
+    { t: 'Sede fortes e corajosos. Nao temais, pois o Senhor, o seu Deus, vai com voces.', r: 'Deuteronomio 31:6' },
+    { t: 'Deleita-te tambem no Senhor, e ele te concedera o que deseja o teu coracao.', r: 'Salmos 37:4' },
+    { t: 'E sabemos que todas as coisas contribuem juntamente para o bem daqueles que amam a Deus.', r: 'Romanos 8:28' },
+    { t: 'Bem-aventurado o homem que confia no Senhor, e cuja esperanca e o Senhor.', r: 'Jeremias 17:7' },
+    { t: 'Alegrai-vos sempre no Senhor; outra vez digo: alegrai-vos.', r: 'Filipenses 4:4' },
+    { t: 'O Senhor e a minha luz e a minha salvacao; a quem temerei?', r: 'Salmos 27:1' },
+    { t: 'Buscai primeiro o Reino de Deus e a sua justica, e todas essas coisas vos serao acrescentadas.', r: 'Mateus 6:33' },
+    { t: 'Se Deus e por nos, quem sera contra nos?', r: 'Romanos 8:31' },
+    { t: 'Toda boa dadiva e todo dom perfeito vem do alto, descendo do Pai das luzes.', r: 'Tiago 1:17' },
+    { t: 'O fruto do Espirito e: amor, alegria, paz, paciencia, amabilidade, bondade, fidelidade.', r: 'Galatas 5:22' },
+    { t: 'Clama a mim, e responder-te-ei, e anunciar-te-ei coisas grandes e firmes, que nao sabes.', r: 'Jeremias 33:3' }
+  ];
+
+  (function(){
+    var now = new Date();
+    var start = new Date(now.getFullYear(), 0, 0);
+    var dayOfYear = Math.floor((now - start) / 86400000);
+    var v = VERSES[dayOfYear % VERSES.length];
+    document.getElementById('verseText').textContent = '“' + v.t + '”';
+    document.getElementById('verseRef').textContent = v.r;
+  })();
 
   /* ═══ INIT + AUTO-REFRESH 2min ═══ */
   renderContas();
