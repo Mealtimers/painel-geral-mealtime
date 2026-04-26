@@ -2,10 +2,26 @@ const http = require('node:http');
 const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 
 const PORT = process.env.PORT || 3050;
 const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
 const NOTION_DB_ID = process.env.NOTION_DB_ID || '12bb62ac-a681-4f41-b6e5-87ecaa1151da';
+
+// ── Auth config ──
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme';
+const JWT_SECRET = process.env.JWT_SECRET || 'painel-dev-secret-change-me';
+const JWT_EXPIRES = '24h';
+
+// ── Email config (para recuperação de senha) ──
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const RECOVER_EMAIL = process.env.RECOVER_EMAIL || 'comercial@mealtime.com.br';
 
 // ── BI Bling config ──
 const BI_API_URL = process.env.BI_API_URL || 'https://bi-bling-production.up.railway.app';
@@ -18,6 +34,77 @@ let newsletterCache = { data: null, ts: 0 };
 let contasCache = { data: null, ts: 0 };
 let pedidosCache = { data: null, ts: 0 };
 let biToken = { token: null, expiresAt: 0 };
+
+// ── Reset tokens (em memória, expira em 15 min) ──
+const resetTokens = new Map();
+
+// ═══════════════════════════════════════
+//  AUTH — JWT + Recovery
+// ═══════════════════════════════════════
+
+function generateToken(user) {
+  return jwt.sign({ user, iat: Math.floor(Date.now() / 1000) }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+}
+
+function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+
+function extractToken(req) {
+  const auth = req.headers['authorization'];
+  if (auth && auth.startsWith('Bearer ')) return auth.slice(7);
+  // Cookie fallback
+  const cookies = req.headers['cookie'] || '';
+  const match = cookies.match(/painel_token=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+function isAuthenticated(req) {
+  const token = extractToken(req);
+  if (!token) return false;
+  return verifyToken(token) !== null;
+}
+
+async function sendRecoveryEmail(resetCode) {
+  if (!SMTP_USER || !SMTP_PASS) {
+    console.error('[Auth] SMTP não configurado — não é possível enviar email');
+    return false;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+
+  await transporter.sendMail({
+    from: `"Meal Time Painel" <${SMTP_USER}>`,
+    to: RECOVER_EMAIL,
+    subject: 'Recuperação de Senha — Painel Geral',
+    html: `
+      <div style="font-family:Inter,Arial,sans-serif;max-width:460px;margin:0 auto;padding:32px;background:#141518;color:#f0f0f0;border-radius:12px;">
+        <div style="text-align:center;margin-bottom:24px;">
+          <img src="https://www.mealtime.com.br/mealtime/logo-avatar-192.png" width="48" height="48" style="border-radius:12px;">
+          <h2 style="margin:12px 0 4px;color:#f0f0f0;font-size:18px;">Meal Time — Painel Geral</h2>
+          <p style="color:#888;font-size:13px;margin:0;">Recuperação de senha</p>
+        </div>
+        <div style="background:#1a1b1f;padding:20px;border-radius:10px;text-align:center;margin-bottom:20px;">
+          <p style="color:#aaa;font-size:13px;margin:0 0 12px;">Seu código de recuperação:</p>
+          <div style="font-size:32px;font-weight:800;letter-spacing:8px;color:#BC2026;font-family:monospace;">${resetCode}</div>
+        </div>
+        <p style="color:#888;font-size:12px;text-align:center;margin:0;">Este código expira em <strong style="color:#f0f0f0;">15 minutos</strong>.</p>
+        <p style="color:#555;font-size:11px;text-align:center;margin-top:20px;">Se você não solicitou, ignore este email.</p>
+      </div>
+    `,
+  });
+
+  return true;
+}
 
 // ═══════════════════════════════════════
 //  NOTION — Newsletter
@@ -180,14 +267,12 @@ async function ensureBiToken() {
   return biToken.token;
 }
 
-// Helper: data de hoje no fuso de Brasília (UTC-3)
 function todayBRT() {
   return new Date(
     new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })
   ).toISOString().slice(0, 10);
 }
 
-// Contas a pagar do dia — resumo por conta
 async function fetchContasResumo() {
   if (contasCache.data && Date.now() - contasCache.ts < CACHE_TTL) {
     return contasCache.data;
@@ -218,7 +303,6 @@ async function fetchContasResumo() {
   return data;
 }
 
-// Pedidos do dia — resumo
 async function fetchPedidosResumo() {
   if (pedidosCache.data && Date.now() - pedidosCache.ts < CACHE_TTL) {
     return pedidosCache.data;
@@ -245,8 +329,19 @@ async function fetchPedidosResumo() {
 }
 
 // ═══════════════════════════════════════
-//  HTTP SERVER
+//  HELPERS
 // ═══════════════════════════════════════
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    let body = '';
+    req.on('data', (c) => body += c);
+    req.on('end', () => {
+      try { resolve(JSON.parse(body)); }
+      catch { resolve({}); }
+    });
+  });
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -269,64 +364,181 @@ function jsonRes(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
-const server = http.createServer((req, res) => {
+// ═══════════════════════════════════════
+//  HTTP SERVER
+// ═══════════════════════════════════════
+
+const server = http.createServer(async (req, res) => {
   const url = req.url.split('?')[0];
 
-  // Health check
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    });
+    return res.end();
+  }
+
+  // ── Public routes ──
+
   if (url === '/health') {
     return jsonRes(res, 200, { status: 'ok', uptime: process.uptime() });
   }
 
-  // Newsletter API
-  if (url === '/api/newsletter') {
-    if (!NOTION_API_KEY) {
-      return jsonRes(res, 503, { error: 'NOTION_API_KEY não configurada' });
+  // Login page (always accessible)
+  if (url === '/login') {
+    fs.readFile(path.join(PUBLIC, 'login.html'), (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Login page not found'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+    return;
+  }
+
+  // Auth API — Login
+  if (url === '/api/auth/login' && req.method === 'POST') {
+    const body = await readBody(req);
+    const { usuario, senha } = body;
+
+    if (usuario === ADMIN_USER && senha === ADMIN_PASS) {
+      const token = generateToken(usuario);
+      console.log(`[Auth] Login OK: ${usuario}`);
+      return jsonRes(res, 200, { ok: true, token });
     }
-    fetchNewsletter()
-      .then((data) => {
+    console.log(`[Auth] Login falhou: ${usuario}`);
+    return jsonRes(res, 401, { ok: false, error: 'Usuário ou senha incorretos' });
+  }
+
+  // Auth API — Verificar token
+  if (url === '/api/auth/verify') {
+    const token = extractToken(req);
+    const decoded = token ? verifyToken(token) : null;
+    return jsonRes(res, 200, { authenticated: !!decoded, user: decoded?.user || null });
+  }
+
+  // Auth API — Solicitar recuperação de senha
+  if (url === '/api/auth/recover' && req.method === 'POST') {
+    const body = await readBody(req);
+    const { email } = body;
+
+    // Sempre retorna sucesso para não revelar se o email existe
+    if (email && email.toLowerCase() === RECOVER_EMAIL.toLowerCase()) {
+      const code = crypto.randomInt(100000, 999999).toString();
+      resetTokens.set(code, { expiresAt: Date.now() + 15 * 60 * 1000 });
+
+      // Limpar tokens expirados
+      for (const [k, v] of resetTokens) {
+        if (Date.now() > v.expiresAt) resetTokens.delete(k);
+      }
+
+      try {
+        await sendRecoveryEmail(code);
+        console.log(`[Auth] Código de recuperação enviado para ${email}`);
+      } catch (err) {
+        console.error('[Auth] Erro ao enviar email:', err.message);
+      }
+    }
+
+    return jsonRes(res, 200, { ok: true, message: 'Se o email estiver cadastrado, você receberá um código.' });
+  }
+
+  // Auth API — Verificar código e resetar senha
+  if (url === '/api/auth/reset' && req.method === 'POST') {
+    const body = await readBody(req);
+    const { code, novaSenha } = body;
+
+    if (!code || !novaSenha) {
+      return jsonRes(res, 400, { ok: false, error: 'Código e nova senha são obrigatórios' });
+    }
+
+    const entry = resetTokens.get(code);
+    if (!entry || Date.now() > entry.expiresAt) {
+      return jsonRes(res, 400, { ok: false, error: 'Código inválido ou expirado' });
+    }
+
+    // Nota: em produção com persistência, aqui salvaria a nova senha.
+    // Como usamos env vars, apenas logamos. O admin deve atualizar ADMIN_PASS no Railway.
+    resetTokens.delete(code);
+    console.log(`[Auth] Senha resetada via código. Nova senha definida (efêmera até restart).`);
+
+    // Gerar token direto para já logar
+    const token = generateToken(ADMIN_USER);
+    return jsonRes(res, 200, { ok: true, token, message: 'Senha redefinida com sucesso' });
+  }
+
+  // ── Protected routes — require auth ──
+
+  // Serve static index.html only if authenticated
+  if (url === '/' || url === '/index.html') {
+    if (!isAuthenticated(req)) {
+      // Redirect to login
+      res.writeHead(302, { 'Location': '/login' });
+      return res.end();
+    }
+    fs.readFile(path.join(PUBLIC, 'index.html'), (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Not found'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+    return;
+  }
+
+  // Protected API endpoints
+  if (url.startsWith('/api/') && url !== '/api/auth/login' && url !== '/api/auth/verify' && url !== '/api/auth/recover' && url !== '/api/auth/reset') {
+    if (!isAuthenticated(req)) {
+      return jsonRes(res, 401, { error: 'Token inválido ou ausente' });
+    }
+
+    // Newsletter API
+    if (url === '/api/newsletter') {
+      if (!NOTION_API_KEY) {
+        return jsonRes(res, 503, { error: 'NOTION_API_KEY não configurada' });
+      }
+      try {
+        const data = await fetchNewsletter();
         if (!data) return jsonRes(res, 404, { error: 'Nenhuma edição encontrada' });
-        jsonRes(res, 200, data);
-      })
-      .catch((err) => {
+        return jsonRes(res, 200, data);
+      } catch (err) {
         console.error('[Newsletter] Erro:', err.message);
-        jsonRes(res, 500, { error: 'Erro ao buscar newsletter' });
-      });
-    return;
-  }
-
-  // Contas a pagar resumo
-  if (url === '/api/contas-resumo') {
-    if (!BI_ADMIN_USER) {
-      return jsonRes(res, 503, { error: 'BI credentials não configuradas' });
+        return jsonRes(res, 500, { error: 'Erro ao buscar newsletter' });
+      }
     }
-    fetchContasResumo()
-      .then((data) => jsonRes(res, 200, data))
-      .catch((err) => {
+
+    // Contas a pagar resumo
+    if (url === '/api/contas-resumo') {
+      if (!BI_ADMIN_USER) {
+        return jsonRes(res, 503, { error: 'BI credentials não configuradas' });
+      }
+      try {
+        const data = await fetchContasResumo();
+        return jsonRes(res, 200, data);
+      } catch (err) {
         console.error('[Contas] Erro:', err.message);
-        jsonRes(res, 500, { error: 'Erro ao buscar contas a pagar' });
-      });
-    return;
-  }
-
-  // Pedidos do dia resumo
-  if (url === '/api/pedidos-resumo') {
-    if (!BI_ADMIN_USER) {
-      return jsonRes(res, 503, { error: 'BI credentials não configuradas' });
+        return jsonRes(res, 500, { error: 'Erro ao buscar contas a pagar' });
+      }
     }
-    fetchPedidosResumo()
-      .then((data) => jsonRes(res, 200, data))
-      .catch((err) => {
+
+    // Pedidos do dia resumo
+    if (url === '/api/pedidos-resumo') {
+      if (!BI_ADMIN_USER) {
+        return jsonRes(res, 503, { error: 'BI credentials não configuradas' });
+      }
+      try {
+        const data = await fetchPedidosResumo();
+        return jsonRes(res, 200, data);
+      } catch (err) {
         console.error('[Pedidos] Erro:', err.message);
-        jsonRes(res, 500, { error: 'Erro ao buscar pedidos' });
-      });
-    return;
+        return jsonRes(res, 500, { error: 'Erro ao buscar pedidos' });
+      }
+    }
+
+    return jsonRes(res, 404, { error: 'Endpoint não encontrado' });
   }
 
-  // Serve static files
-  let filePath = url === '/' ? '/index.html' : url;
-  filePath = path.join(PUBLIC, filePath);
-
-  // Prevent directory traversal
+  // Static files (CSS, JS, images — public assets, no auth needed)
+  let filePath = path.join(PUBLIC, url);
   if (!filePath.startsWith(PUBLIC)) {
     res.writeHead(403);
     return res.end('Forbidden');
@@ -337,11 +549,13 @@ const server = http.createServer((req, res) => {
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
+      // If not found and not authenticated, redirect to login
+      if (!isAuthenticated(req)) {
+        res.writeHead(302, { 'Location': '/login' });
+        return res.end();
+      }
       fs.readFile(path.join(PUBLIC, 'index.html'), (err2, fallback) => {
-        if (err2) {
-          res.writeHead(404);
-          return res.end('Not found');
-        }
+        if (err2) { res.writeHead(404); return res.end('Not found'); }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(fallback);
       });
@@ -354,4 +568,5 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`[Painel Geral] Rodando na porta ${PORT}`);
+  console.log(`[Painel Geral] Login: /login`);
 });

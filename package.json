@@ -1,6 +1,6 @@
 {
   "name": "painel-geral-mealtime",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Painel Geral Meal Time — Hub central de sistemas",
   "main": "server.js",
   "scripts": {
@@ -8,5 +8,9 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.15"
   }
 }

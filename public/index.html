@@ -255,6 +255,25 @@
       animation: pulse 2s ease-in-out infinite;
     }
 
+    .sb-logout {
+      background: none;
+      border: 1px solid transparent;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .sb-logout:hover {
+      color: var(--mt-red);
+      background: var(--mt-red-soft);
+      border-color: rgba(188,32,38,0.15);
+    }
+
     /* ─── MAIN DASHBOARD ─── */
     .main {
       overflow-y: auto;
@@ -669,6 +688,9 @@
         <span class="sb-status-dot"></span>
         Online
       </div>
+      <button onclick="logout()" class="sb-logout" title="Sair">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      </button>
     </div>
   </aside>
 
@@ -708,6 +730,31 @@
 
 <script>
   var ar = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
+
+  /* ═══ AUTH HELPER ═══ */
+  function getToken() {
+    return localStorage.getItem('painel_token') || '';
+  }
+
+  function authFetch(url) {
+    return fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + getToken() }
+    }).then(function(r) {
+      if (r.status === 401) {
+        localStorage.removeItem('painel_token');
+        document.cookie = 'painel_token=; path=/; max-age=0';
+        window.location.href = '/login';
+        throw new Error('Sessão expirada');
+      }
+      return r.json();
+    });
+  }
+
+  function logout() {
+    localStorage.removeItem('painel_token');
+    document.cookie = 'painel_token=; path=/; max-age=0';
+    window.location.href = '/login';
+  }
 
   /* ═══ GREETING + DATE ═══ */
   (function(){
@@ -824,8 +871,7 @@
 
   /* ═══ CONTAS A PAGAR ═══ */
   function renderContas(){
-    fetch('/api/contas-resumo')
-      .then(function(r){ return r.json(); })
+    authFetch('/api/contas-resumo')
       .then(function(d){
         var el = document.getElementById('alertContas');
         if(d.error){ el.innerHTML='<div class="d-empty">Sem dados</div>'; return; }
@@ -857,8 +903,7 @@
 
   /* ═══ PEDIDOS DO DIA ═══ */
   function renderPedidos(){
-    fetch('/api/pedidos-resumo')
-      .then(function(r){ return r.json(); })
+    authFetch('/api/pedidos-resumo')
       .then(function(d){
         var el = document.getElementById('alertPedidos');
         if(d.error){ el.innerHTML='<div class="d-empty">Sem dados</div>'; return; }
@@ -892,8 +937,7 @@
   /* ═══ NEWSLETTER ═══ */
   function renderNewsletter(){
     var el = document.getElementById('newsletter');
-    fetch('/api/newsletter')
-      .then(function(r){ return r.json(); })
+    authFetch('/api/newsletter')
       .then(function(d){
         if(d.error) throw new Error(d.error);
         var items=[
