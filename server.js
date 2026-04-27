@@ -12,8 +12,8 @@ const NOTION_DB_ID = process.env.NOTION_DB_ID || '12bb62ac-a681-4f41-b6e5-87ecaa
 
 // ── Auth config ──
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'Mealtime290312!';
-const JWT_SECRET = process.env.JWT_SECRET || 'mt-painel-geral-jwt-s3cr3t-2026-xK9pLmN7qR2w';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme';
+const JWT_SECRET = process.env.JWT_SECRET || 'painel-dev-secret-change-me';
 const JWT_EXPIRES = '24h';
 
 // ── Email config ──
