@@ -1,7 +1,11 @@
-[build]
-builder = "nixpacks"
+[project]
+id = "113c28dc-4067-413c-a0d9-b2dbe75ab270"
+environment = "production"
+name = "astonishing-freedom"
 
-[deploy]
-startCommand = "node server.js"
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
+[service]
+name = "painel-geral-mealtime"
+
+[[deploy.volumes]]
+mount = "/data"
+name = "painel-data"

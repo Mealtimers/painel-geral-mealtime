@@ -79,16 +79,24 @@ function getUsers() {
     }];
     saveUsers(users);
   } else {
-    // Sincronizar senha do admin com env var (caso tenha mudado)
+    // Garantir que admin existe (mas NUNCA sobrescrever senha alterada pelo painel)
     const admin = users.find(u => u.usuario === ADMIN_USER && u.perfil === 'admin');
-    if (admin) {
-      const envHash = hashPassword(ADMIN_PASS);
-      if (admin.senha !== envHash) {
-        admin.senha = envHash;
-        admin.email = admin.email || RECOVER_EMAIL;
-        saveUsers(users);
-        console.log('[Users] Senha do admin sincronizada com ADMIN_PASS');
-      }
+    if (!admin) {
+      // Admin foi deletado — recriar
+      users.push({
+        id: crypto.randomUUID(),
+        usuario: ADMIN_USER,
+        senha: hashPassword(ADMIN_PASS),
+        nome: 'Administrador',
+        email: RECOVER_EMAIL,
+        telefone: '',
+        cargo: 'Administrador',
+        perfil: 'admin',
+        ativo: true,
+        criadoEm: new Date().toISOString(),
+      });
+      saveUsers(users);
+      console.log('[Users] Admin recriado (não existia)');
     }
   }
   return users;
