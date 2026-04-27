@@ -906,40 +906,56 @@
     t(); setInterval(t, 30000);
   })();
 
+  /* ═══ SSO HELPER ═══ */
+  // Apps internos (nossos) recebem sso_token na URL
+  // Apps externos (Bling, Prefiro Delivery) abrem direto
+  function ssoUrl(url, isInternal) {
+    if (!url || !isInternal) return url;
+    var token = getToken();
+    if (!token) return url;
+    var separator = url.indexOf('?') >= 0 ? '&' : '?';
+    // Se URL tem hash (#), insere o token antes do hash
+    var hashIdx = url.indexOf('#');
+    if (hashIdx >= 0) {
+      return url.substring(0, hashIdx) + separator + 'sso_token=' + token + url.substring(hashIdx);
+    }
+    return url + separator + 'sso_token=' + token;
+  }
+
   /* ═══ SIDEBAR MENU ═══ */
   var SECTIONS = [
     {
       title: 'Dados & Inteligencia',
       apps: [
         { id:'bi', title:'BI Inteligencia', desc:'Fabrica, lojas e KPIs', icon:'📊', ic:'i-bi',
-          url:'https://bi-bling-production.up.railway.app/bi.html#vendas' }
+          url:'https://bi-bling-production.up.railway.app/bi.html#vendas', sso:true }
       ]
     },
     {
       title: 'Canal de Vendas',
       apps: [
         { id:'meta', title:'Meta Ads', desc:'Campanhas', icon:'📢', ic:'i-meta',
-          url:'https://meta-ads-dashboard-production-1f44.up.railway.app' },
-        { id:'ecom', title:'E-commerce', desc:'Prefiro Delivery', icon:'🛒', ic:'i-ecom', url:null,
+          url:'https://meta-ads-dashboard-production-1f44.up.railway.app', sso:true },
+        { id:'ecom', title:'E-commerce', desc:'Prefiro Delivery', icon:'🛒', ic:'i-ecom', url:null, sso:false,
           subs:[
-            {l:'Pelotas', u:'https://painel.prefirodelivery.com/pelotas_mealtime'},
-            {l:'Santa Maria', u:'https://painel.prefirodelivery.com/santamaria_mealtime'}
+            {l:'Pelotas', u:'https://painel.prefirodelivery.com/pelotas_mealtime', sso:false},
+            {l:'Santa Maria', u:'https://painel.prefirodelivery.com/santamaria_mealtime', sso:false}
           ]},
         { id:'crm', title:'CRM', desc:'Clientes e recompra', icon:'👥', ic:'i-crm',
-          url:'https://meal-time-crm-production.up.railway.app/' },
+          url:'https://meal-time-crm-production.up.railway.app/', sso:true },
         { id:'mkt', title:'MKT Marketing', desc:'Conteudo e organico', icon:'📋', ic:'i-mkt',
-          url:'https://marketing-hub-mealtime-production.up.railway.app' }
+          url:'https://marketing-hub-mealtime-production.up.railway.app', sso:true }
       ]
     },
     {
       title: 'Producao',
       apps: [
         { id:'estoque', title:'Estoque Fabrica', desc:'Inventario e producao', icon:'📦', ic:'i-estoque',
-          url:'https://estoque-fabrica-mealtime-production.up.railway.app' },
+          url:'https://estoque-fabrica-mealtime-production.up.railway.app', sso:true },
         { id:'dietas', title:'Gerador de Pedidos', desc:'Personalizados e B2B', icon:'🥗', ic:'i-dietas',
-          url:'https://charismatic-friendship-production-b81d.up.railway.app/' },
+          url:'https://charismatic-friendship-production-b81d.up.railway.app/', sso:true },
         { id:'fin', title:'Financeiro / ERP', desc:'Bling — contas e NFs', icon:'💰', ic:'i-fin',
-          url:'https://www.bling.com.br/inicio#/' }
+          url:'https://www.bling.com.br/inicio#/', sso:false }
       ]
     }
   ];
@@ -966,16 +982,31 @@
           var subsDiv = document.createElement('div');
           subsDiv.className = 'sb-subs';
           a.subs.forEach(function(s){
-            subsDiv.innerHTML += '<a class="sb-sub" href="'+s.u+'" target="_blank" rel="noopener"><span class="sb-sub-dot"></span>'+s.l+'</a>';
+            var subLink = document.createElement('a');
+            subLink.className = 'sb-sub';
+            subLink.target = '_blank';
+            subLink.rel = 'noopener';
+            subLink.innerHTML = '<span class="sb-sub-dot"></span>'+s.l;
+            subLink.addEventListener('click', function(e){
+              e.preventDefault();
+              window.open(ssoUrl(s.u, s.sso||false), '_blank');
+            });
+            subsDiv.appendChild(subLink);
           });
           wrap.appendChild(subsDiv);
           nav.appendChild(wrap);
         } else {
           var item = document.createElement('a');
           item.className = 'sb-item';
-          item.href = a.url || '#';
-          item.target = '_blank';
-          item.rel = 'noopener';
+          item.href = '#';
+          item.dataset.url = a.url || '';
+          item.dataset.sso = a.sso ? '1' : '0';
+          item.addEventListener('click', function(e){
+            e.preventDefault();
+            var u = this.dataset.url;
+            if(!u) return;
+            window.open(ssoUrl(u, this.dataset.sso==='1'), '_blank');
+          });
           item.innerHTML =
             '<div class="sb-item-icon '+a.ic+'">'+a.icon+'</div>'+
             '<div class="sb-item-info"><div class="sb-item-name">'+a.title+'</div><div class="sb-item-desc">'+a.desc+'</div></div>'+
