@@ -78,6 +78,18 @@ function getUsers() {
       criadoEm: new Date().toISOString(),
     }];
     saveUsers(users);
+  } else {
+    // Sincronizar senha do admin com env var (caso tenha mudado)
+    const admin = users.find(u => u.usuario === ADMIN_USER && u.perfil === 'admin');
+    if (admin) {
+      const envHash = hashPassword(ADMIN_PASS);
+      if (admin.senha !== envHash) {
+        admin.senha = envHash;
+        admin.email = admin.email || RECOVER_EMAIL;
+        saveUsers(users);
+        console.log('[Users] Senha do admin sincronizada com ADMIN_PASS');
+      }
+    }
   }
   return users;
 }
