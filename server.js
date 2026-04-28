@@ -362,15 +362,21 @@ async function fetchContasResumo() {
   const res = await biRequest('GET', `/api/bi/contas-pagar?dateFrom=${today}&dateTo=${today}&dateField=vencimento`);
   if (res.status !== 200 || !res.data.ok) throw new Error('BI contas-pagar error');
   const porConta = {};
+  const valoresPorConta = {};
   let total = 0;
+  let valorTotal = 0;
   for (const row of (res.data.rows || [])) {
     if (row.situacao === 'PAGO') continue;
     const nome = row.accountName || 'Sem conta';
+    const valor = Number(row.valor || 0);
     if (!porConta[nome]) porConta[nome] = 0;
+    if (!valoresPorConta[nome]) valoresPorConta[nome] = 0;
     porConta[nome]++;
+    valoresPorConta[nome] += valor;
     total++;
+    valorTotal += valor;
   }
-  const data = { total, porConta, data: today };
+  const data = { total, valorTotal, porConta, valoresPorConta, data: today };
   contasCache = { data, ts: Date.now() };
   return data;
 }
