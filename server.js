@@ -5,6 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const supabase = require('./lib/supabaseClient');
 
 const PORT = process.env.PORT || 3050;
 const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
@@ -235,6 +236,7 @@ const CACHE_TTL = 2 * 60 * 1000;
 let newsletterCache = { data: null, ts: 0 };
 let contasCache = { data: null, ts: 0 };
 let pedidosCache = { data: null, ts: 0 };
+let overviewCache = { data: null, ts: 0 };
 let biToken = { token: null, expiresAt: 0 };
 
 function notionRequest(endpoint, body) {
@@ -390,6 +392,41 @@ async function fetchPedidosResumo() {
   const summary = res.data.summary || {};
   const data = { total: summary.ordersCount || 0, valor: summary.ordersValue || 0, data: today };
   pedidosCache = { data, ts: Date.now() };
+  return data;
+}
+
+// Overview unificado (lê dashboard.overview_today no Supabase).
+// View materializada — refresh agendado via pg_cron a cada 5min.
+async function fetchOverviewUnificado() {
+  if (overviewCache.data && Date.now() - overviewCache.ts < CACHE_TTL) return overviewCache.data;
+  if (!supabase.isConfigured()) {
+    return { ok: false, error: 'Supabase não configurado', configured: false };
+  }
+  const rows = await supabase.select('dashboard.overview_today', 'select=*&limit=1');
+  const row = Array.isArray(rows) && rows.length ? rows[0] : null;
+  const data = {
+    ok: true,
+    configured: true,
+    data: row ? row.data_ref : todayBRT(),
+    bling: {
+      orders: { qtd: row?.bling_orders_qtd || 0, valor: Number(row?.bling_orders_valor || 0) },
+      contasPagar: {
+        qtd: row?.contas_pagar_qtd || 0,
+        valor: Number(row?.contas_pagar_valor || 0),
+        porConta: row?.contas_pagar_por_conta || [],
+      },
+    },
+    dieta: {
+      pendentes: row?.dieta_pendentes_qtd || 0,
+      hoje: row?.dieta_hoje_qtd || 0,
+    },
+    fabrica: {
+      movimentacoesHoje: row?.fabrica_mov_qtd || 0,
+      estoqueCritico: row?.estoque_critico_qtd || 0,
+    },
+    refreshedAt: row?.refreshed_at || null,
+  };
+  overviewCache = { data, ts: Date.now() };
   return data;
 }
 
@@ -642,6 +679,12 @@ const server = http.createServer(async (req, res) => {
       if (!BI_ADMIN_USER) return jsonRes(res, 503, { error: 'BI não configurado' });
       try { return jsonRes(res, 200, await fetchPedidosResumo()); }
       catch (err) { console.error('[Pedidos]', err.message); return jsonRes(res, 500, { error: 'Erro pedidos' }); }
+    }
+
+    if (url === '/api/overview-unificado') {
+      const user = requireAuth(req, res); if (!user) return;
+      try { return jsonRes(res, 200, await fetchOverviewUnificado()); }
+      catch (err) { console.error('[Overview]', err.message); return jsonRes(res, 500, { error: 'Erro overview' }); }
     }
 
     return jsonRes(res, 404, { error: 'Endpoint não encontrado' });

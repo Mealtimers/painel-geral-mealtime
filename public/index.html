@@ -835,6 +835,12 @@
         <div class="d-card anim" id="alertPedidos" style="animation-delay:.1s">
           <div class="d-load">Carregando pedidos...</div>
         </div>
+        <div class="d-card anim" id="alertDieta" style="animation-delay:.12s">
+          <div class="d-load">Carregando dieta...</div>
+        </div>
+        <div class="d-card anim" id="alertFabrica" style="animation-delay:.14s">
+          <div class="d-load">Carregando fábrica...</div>
+        </div>
       </div>
 
       <div class="dash-nl anim" id="newsletter" style="animation-delay:.15s">
@@ -1090,6 +1096,69 @@
       .catch(function(){ document.getElementById('alertPedidos').innerHTML='<div class="d-empty">Pedidos indisponivel</div>'; });
   }
 
+  /* ═══ OVERVIEW UNIFICADO (Dieta + Fábrica) ═══ */
+  // Único request alimenta os 2 cards.
+  var overviewPromise = null;
+  function loadOverview(){
+    if(!overviewPromise || (overviewPromise._ts && Date.now()-overviewPromise._ts > 60000)){
+      overviewPromise = authFetch('/api/overview-unificado');
+      overviewPromise._ts = Date.now();
+    }
+    return overviewPromise;
+  }
+
+  function renderDieta(){
+    var el = document.getElementById('alertDieta');
+    loadOverview().then(function(d){
+      if(!d || d.ok === false){
+        el.innerHTML =
+          '<div class="d-head"><div class="d-icon" style="background:rgba(167,139,250,.15);color:#a78bfa">🥗</div><div><div class="d-title">Pedidos Dieta</div><div class="d-sub">Supabase não configurado</div></div></div>'+
+          '<div class="d-empty">Configure SUPABASE_URL e SUPABASE_SERVICE_KEY</div>';
+        return;
+      }
+      var dieta = d.dieta || {};
+      var pendentes = dieta.pendentes || 0;
+      var hoje = dieta.hoje || 0;
+      var wasExpanded = el.classList.contains('expanded');
+      el.innerHTML =
+        '<div class="d-head" onclick="toggleCard(\'alertDieta\')"><div class="d-icon" style="background:rgba(167,139,250,.15);color:#a78bfa">🥗</div><div><div class="d-title">Pedidos Dieta</div><div class="d-sub">Pendentes / criados hoje</div></div><div class="d-toggle">'+chevronSvg+'</div></div>'+
+        '<div class="d-big" style="color:#a78bfa">'+pendentes+'</div>'+
+        '<div class="d-body"><div class="d-rows">'+
+          '<div class="d-row"><span class="d-row-name"><span class="d-dot" style="background:#a78bfa"></span>Em pipeline</span><span class="d-row-n">'+pendentes+'</span></div>'+
+          '<div class="d-row"><span class="d-row-name"><span class="d-dot" style="background:#60a5fa"></span>Criados hoje</span><span class="d-row-n">'+hoje+'</span></div>'+
+        '</div></div>';
+      if(wasExpanded) el.classList.add('expanded');
+    }).catch(function(){
+      el.innerHTML='<div class="d-empty">Dieta indisponivel</div>';
+    });
+  }
+
+  function renderFabrica(){
+    var el = document.getElementById('alertFabrica');
+    loadOverview().then(function(d){
+      if(!d || d.ok === false){
+        el.innerHTML =
+          '<div class="d-head"><div class="d-icon" style="background:rgba(96,165,250,.15);color:#60a5fa">🏭</div><div><div class="d-title">Fábrica</div><div class="d-sub">Supabase não configurado</div></div></div>'+
+          '<div class="d-empty">Configure SUPABASE_URL e SUPABASE_SERVICE_KEY</div>';
+        return;
+      }
+      var f = d.fabrica || {};
+      var movs = f.movimentacoesHoje || 0;
+      var critico = f.estoqueCritico || 0;
+      var wasExpanded = el.classList.contains('expanded');
+      el.innerHTML =
+        '<div class="d-head" onclick="toggleCard(\'alertFabrica\')"><div class="d-icon" style="background:rgba(96,165,250,.15);color:#60a5fa">🏭</div><div><div class="d-title">Fábrica</div><div class="d-sub">Movimentações hoje / estoque</div></div><div class="d-toggle">'+chevronSvg+'</div></div>'+
+        '<div class="d-big" style="color:#60a5fa">'+movs+'</div>'+
+        '<div class="d-body"><div class="d-rows">'+
+          '<div class="d-row"><span class="d-row-name"><span class="d-dot" style="background:#60a5fa"></span>Movimentações hoje</span><span class="d-row-n">'+movs+'</span></div>'+
+          '<div class="d-row"><span class="d-row-name"><span class="d-dot" style="background:'+(critico>0?'#e85d5d':'#6dcf6d')+'"></span>Estoque crítico</span><span class="d-row-n" style="color:'+(critico>0?'var(--mt-red)':'var(--mt-green)')+'">'+critico+'</span></div>'+
+        '</div></div>';
+      if(wasExpanded) el.classList.add('expanded');
+    }).catch(function(){
+      el.innerHTML='<div class="d-empty">Fábrica indisponivel</div>';
+    });
+  }
+
   /* ═══ NEWSLETTER ═══ */
   function renderNewsletter(){
     var el = document.getElementById('newsletter');
@@ -1171,8 +1240,17 @@
   /* ═══ INIT + AUTO-REFRESH 2min ═══ */
   renderContas();
   renderPedidos();
+  renderDieta();
+  renderFabrica();
   renderNewsletter();
-  setInterval(function(){ renderContas(); renderPedidos(); renderNewsletter(); }, 2*60*1000);
+  setInterval(function(){
+    overviewPromise = null; // invalida cache do overview unificado
+    renderContas();
+    renderPedidos();
+    renderDieta();
+    renderFabrica();
+    renderNewsletter();
+  }, 2*60*1000);
 
   /* ═══ USER PROFILE ═══ */
   var currentUser = null;
