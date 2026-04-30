@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Meal Time | Painel Geral</title>
   <link rel="icon" href="https://www.mealtime.com.br/mealtime/logo-avatar-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Meal Time">
+  <meta name="theme-color" content="#BC2026">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -765,20 +770,118 @@
     .sb-user-name { font-size: 0.72rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sb-user-role { font-size: 0.58rem; color: var(--text-tertiary); }
 
-    /* Responsive */
-    @media (max-width: 900px) {
+    /* ─── HAMBURGER BUTTON ─── */
+    .hamburger {
+      display: none;
+      position: fixed;
+      top: 12px; left: 12px;
+      z-index: 1001;
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--mt-panel);
+      color: var(--text-primary);
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hamburger:hover { background: var(--mt-card); border-color: var(--border-hover); }
+    .hamburger svg { width: 20px; height: 20px; }
+
+    /* ─── DRAWER OVERLAY ─── */
+    .drawer-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 998;
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      opacity: 0;
+      transition: opacity 0.3s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .drawer-overlay.open { display: block; opacity: 1; }
+
+    /* ─── RESPONSIVE ≤768px ─── */
+    @media (max-width: 768px) {
+      :root { --sidebar-w: 280px; }
+
+      .hamburger { display: flex; }
+
       .shell {
         grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
       }
+
       .sidebar {
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-        max-height: 50vh;
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        width: var(--sidebar-w);
+        z-index: 999;
+        border-right: 1px solid var(--border);
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+        overflow-y: auto;
       }
-      .main { padding: 24px 18px; }
-      .dash-alerts { grid-template-columns: 1fr; }
-      .nl-grid { grid-template-columns: 1fr; }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .main {
+        padding: 68px 16px 24px;
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+        padding-bottom: max(24px, env(safe-area-inset-bottom));
+      }
+
+      .main-inner { max-width: 100%; }
+
+      .dash-greeting { font-size: 1.3rem; }
+
+      .dash-alerts {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .nl-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .dash-nl { padding: 16px; }
+
+      .d-big { font-size: 1.8rem; }
+
+      /* Sidebar items — touch targets ≥44px */
+      .sb-item { padding: 12px 10px; min-height: 44px; }
+      .sb-sub { padding: 8px 8px; min-height: 44px; }
+      .sb-user-btn { padding: 14px; min-height: 48px; }
+      .sb-logout { width: 44px; height: 44px; }
+    }
+
+    /* ─── RESPONSIVE ≤480px ─── */
+    @media (max-width: 480px) {
+      .dash-greeting { font-size: 1.1rem; }
+      .dash-date { font-size: 0.74rem; }
+      .main { padding: 64px 12px 20px; }
+
+      .d-card { padding: 14px 16px; }
+      .d-big { font-size: 1.5rem; }
+
+      .verse-text { font-size: 0.74rem; }
+
+      /* Modal fullscreen */
+      .modal {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 100vh !important;
+        height: 100vh;
+        border-radius: 0;
+        border: none;
+      }
+      .modal-overlay { align-items: stretch; }
     }
 
     /* Scrollbar */
@@ -788,6 +891,14 @@
   </style>
 </head>
 <body>
+
+<!-- Hamburger (mobile only) -->
+<button class="hamburger" id="hamburgerBtn" aria-label="Abrir menu">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</button>
+
+<!-- Drawer overlay (mobile only) -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
 
 <div class="shell">
 
@@ -860,6 +971,26 @@
 </div>
 
 <script>
+  /* ═══ DRAWER TOGGLE (MOBILE) ═══ */
+  (function() {
+    var hamburger = document.getElementById('hamburgerBtn');
+    var overlay   = document.getElementById('drawerOverlay');
+    var sidebar   = document.querySelector('.sidebar');
+
+    function openDrawer()  { sidebar.classList.add('open'); overlay.classList.add('open'); }
+    function closeDrawer() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+
+    hamburger.addEventListener('click', function() {
+      sidebar.classList.contains('open') ? closeDrawer() : openDrawer();
+    });
+    overlay.addEventListener('click', closeDrawer);
+
+    // Close drawer when clicking a nav link (mobile)
+    sidebar.addEventListener('click', function(e) {
+      if (e.target.closest('.sb-link') && window.innerWidth <= 768) closeDrawer();
+    });
+  })();
+
   var ar = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
 
   /* ═══ AUTH HELPER ═══ */
