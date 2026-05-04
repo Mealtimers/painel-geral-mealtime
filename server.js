@@ -42,65 +42,160 @@ function hashPassword(pass) {
   return crypto.createHash('sha256').update(pass + JWT_SECRET).digest('hex');
 }
 
-function loadUsers() {
+// ─── Persistência de Users ───
+// Fonte da verdade: Supabase core.users (sobrevive a deploys/restart sem volume).
+// Cache em memória + arquivo local como fallback rápido (boot sync).
+//
+// Fluxo:
+//   1. Boot sync: lê file pra encher cache (rápido, sem await).
+//   2. Boot async (fire-and-forget): puxa do Supabase e SOBRESCREVE cache.
+//   3. saveUsers: atualiza cache + grava file + UPSERT Supabase (await).
+//
+// Isso resolve o problema de Railway sem volume montado em /data —
+// o file desaparece a cada deploy mas o Supabase persiste.
+
+let _usersCache = null;
+
+// ─── Mappers DB ↔ in-memory ───
+// In-memory shape (legado): { id, usuario, senha, nome, email, telefone, cargo, perfil, ativo, criadoEm, atualizadoEm }
+// Supabase core.users:      { id (uuid), usuario, password_hash, nome, email, telefone, cargo, perfil, ativo, criado_em, atualizado_em }
+
+function mapUserToDb(u) {
+  return {
+    id: u.id, // UUID gerado pelo painel — mantém compat com sessions JWT
+    usuario: u.usuario,
+    password_hash: u.senha || null,
+    nome: u.nome || null,
+    email: u.email || null,
+    telefone: u.telefone || null,
+    cargo: u.cargo || null,
+    perfil: u.perfil || 'usuario',
+    ativo: u.ativo !== false,
+    criado_em: u.criadoEm || new Date().toISOString(),
+    atualizado_em: u.atualizadoEm || new Date().toISOString(),
+  };
+}
+
+function mapUserFromDb(r) {
+  return {
+    id: r.id,
+    usuario: r.usuario,
+    senha: r.password_hash || '',
+    nome: r.nome || '',
+    email: r.email || '',
+    telefone: r.telefone || '',
+    cargo: r.cargo || '',
+    perfil: r.perfil || 'usuario',
+    ativo: r.ativo !== false,
+    criadoEm: r.criado_em || null,
+    atualizadoEm: r.atualizado_em || null,
+  };
+}
+
+function loadUsersFromFile() {
   try {
     if (fs.existsSync(USERS_FILE)) {
       return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
     }
   } catch (e) {
-    console.error('[Users] Erro ao ler:', e.message);
+    console.error('[Users] Erro ao ler file:', e.message);
   }
   return null;
 }
 
-function saveUsers(users) {
+function saveUsersToFile(users) {
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
   } catch (e) {
-    console.error('[Users] Erro ao salvar:', e.message);
+    console.error('[Users] Erro ao gravar file:', e.message);
   }
 }
 
-function getUsers() {
-  let users = loadUsers();
-  if (!users) {
-    // Inicializar com admin padrão
-    users = [{
-      id: crypto.randomUUID(),
-      usuario: ADMIN_USER,
-      senha: hashPassword(ADMIN_PASS),
-      nome: 'Administrador',
-      email: RECOVER_EMAIL,
-      telefone: '',
-      cargo: 'Administrador',
-      perfil: 'admin',
-      ativo: true,
-      criadoEm: new Date().toISOString(),
-    }];
-    saveUsers(users);
+async function loadUsersFromSupabase() {
+  if (!supabase.isConfigured()) return null;
+  try {
+    const rows = await supabase.select('core.users', 'select=*&order=criado_em.asc');
+    if (Array.isArray(rows)) return rows.map(mapUserFromDb);
+  } catch (e) {
+    console.error('[Users] Falha ler Supabase:', e.message);
+  }
+  return null;
+}
+
+async function saveUsersToSupabase(users) {
+  if (!supabase.isConfigured()) return false;
+  try {
+    await supabase.upsert('core.users', users.map(mapUserToDb), 'id');
+    return true;
+  } catch (e) {
+    console.error('[Users] Falha gravar Supabase:', e.message);
+    return false;
+  }
+}
+
+function ensureAdmin(users) {
+  const admin = users.find(u => u.usuario === ADMIN_USER && u.perfil === 'admin');
+  if (admin) return users;
+  users.push({
+    id: crypto.randomUUID(),
+    usuario: ADMIN_USER,
+    senha: hashPassword(ADMIN_PASS),
+    nome: 'Administrador',
+    email: RECOVER_EMAIL,
+    telefone: '',
+    cargo: 'Administrador',
+    perfil: 'admin',
+    ativo: true,
+    criadoEm: new Date().toISOString(),
+  });
+  console.log('[Users] Admin padrão criado/recriado.');
+  return users;
+}
+
+// Boot sync: enche cache do file (ou cria admin default).
+function loadUsers() {
+  const file = loadUsersFromFile();
+  if (file && Array.isArray(file)) {
+    _usersCache = ensureAdmin(file);
   } else {
-    // Garantir que admin existe (mas NUNCA sobrescrever senha alterada pelo painel)
-    const admin = users.find(u => u.usuario === ADMIN_USER && u.perfil === 'admin');
-    if (!admin) {
-      // Admin foi deletado — recriar
-      users.push({
-        id: crypto.randomUUID(),
-        usuario: ADMIN_USER,
-        senha: hashPassword(ADMIN_PASS),
-        nome: 'Administrador',
-        email: RECOVER_EMAIL,
-        telefone: '',
-        cargo: 'Administrador',
-        perfil: 'admin',
-        ativo: true,
-        criadoEm: new Date().toISOString(),
-      });
-      saveUsers(users);
-      console.log('[Users] Admin recriado (não existia)');
+    _usersCache = ensureAdmin([]);
+    saveUsersToFile(_usersCache);
+  }
+  return _usersCache;
+}
+
+// Boot async (fire-and-forget): puxa do Supabase e SOBRESCREVE cache se houver.
+// Se Supabase está vazio, faz seed inicial com o cache atual.
+async function syncUsersFromSupabase() {
+  if (!supabase.isConfigured()) {
+    console.log('[Users] Supabase não configurado — usando apenas file local.');
+    return;
+  }
+  const remote = await loadUsersFromSupabase();
+  if (Array.isArray(remote) && remote.length > 0) {
+    _usersCache = ensureAdmin(remote);
+    saveUsersToFile(_usersCache); // mantém file como fallback consistente
+    console.log(`[Users] Carregado ${remote.length} user(s) do Supabase.`);
+  } else {
+    // Supabase vazio — sobe o cache atual (file ou admin default).
+    if (_usersCache && _usersCache.length > 0) {
+      const ok = await saveUsersToSupabase(_usersCache);
+      if (ok) console.log(`[Users] Seed inicial Supabase com ${_usersCache.length} user(s).`);
     }
   }
-  return users;
+}
+
+function saveUsers(users) {
+  _usersCache = users;
+  saveUsersToFile(users);
+  // Fire-and-forget Supabase upsert (await falharia se rede lenta — não bloqueia UX)
+  saveUsersToSupabase(users).catch((e) => console.error('[Users] sync Supabase falhou:', e.message));
+}
+
+function getUsers() {
+  if (!_usersCache) loadUsers();
+  return _usersCache;
 }
 
 function findUser(usuario) {
@@ -713,6 +808,11 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`[Painel Geral] Porta ${PORT}`);
   console.log(`[Painel Geral] Login: /login`);
-  // Garantir que admin existe
+  // 1. Boot sync: enche cache do file (ou cria admin default).
   getUsers();
+  // 2. Boot async: tenta sincronizar com Supabase (source of truth).
+  //    Se Supabase tem dados, sobrescreve cache. Se vazio, faz seed inicial.
+  syncUsersFromSupabase().catch((e) =>
+    console.error('[Users] sync inicial Supabase falhou:', e.message)
+  );
 });
