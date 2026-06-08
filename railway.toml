@@ -5,3 +5,10 @@ name = "astonishing-freedom"
 
 [service]
 name = "painel-geral-mealtime"
+
+[build]
+builder = "nixpacks"
+
+[[deploy.volumes]]
+mount = "/data"
+name = "painel-data"
