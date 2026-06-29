@@ -22,6 +22,29 @@ const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
+
+// ── Brevo (HTTP) — Railway bloqueia SMTP; e-mail sai por HTTPS (api.brevo.com).
+// resolveBrevoKey tolera nome de variável com espaço acidental (" BREVO_API_KEY").
+function resolveBrevoKey() {
+  if (process.env.BREVO_API_KEY && process.env.BREVO_API_KEY.trim()) return process.env.BREVO_API_KEY.trim();
+  for (const k in process.env) { if (k.trim() === 'BREVO_API_KEY' && process.env[k] && process.env[k].trim()) return process.env[k].trim(); }
+  return '';
+}
+const BREVO_API_KEY = resolveBrevoKey();
+const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || 'comercial@mealtime.com.br';
+const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || 'Meal Time';
+async function sendViaBrevo(to, subject, html) {
+  try {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
+      body: JSON.stringify({ sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME }, to: [{ email: to }], subject, htmlContent: html }),
+    });
+    if (resp.ok) return true;
+    console.error('[mail] Brevo falhou:', resp.status, (await resp.text().catch(() => '')).slice(0, 200));
+    return false;
+  } catch (e) { console.error('[mail] Brevo erro:', e.message); return false; }
+}
 const RECOVER_EMAIL = process.env.RECOVER_EMAIL || 'comercial@mealtime.com.br';
 
 // ── BI Bling config ──
@@ -292,20 +315,8 @@ function getAuthUser(req) {
 const resetTokens = new Map();
 
 async function sendRecoveryEmail(email, resetCode) {
-  if (!SMTP_USER || !SMTP_PASS) {
-    console.error('[Auth] SMTP não configurado');
-    return false;
-  }
-  const transporter = nodemailer.createTransport({
-    host: SMTP_HOST, port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-  });
-  await transporter.sendMail({
-    from: `"Meal Time Painel" <${SMTP_USER}>`,
-    to: email,
-    subject: 'Recuperação de Senha — Painel Geral',
-    html: `
+  const subject = 'Recuperação de Senha — Painel Geral';
+  const html = `
       <div style="font-family:Inter,Arial,sans-serif;max-width:460px;margin:0 auto;padding:32px;background:#141518;color:#f0f0f0;border-radius:12px;">
         <div style="text-align:center;margin-bottom:24px;">
           <img src="https://www.mealtime.com.br/mealtime/logo-avatar-192.png" width="48" height="48" style="border-radius:12px;">
@@ -318,9 +329,20 @@ async function sendRecoveryEmail(email, resetCode) {
         </div>
         <p style="color:#888;font-size:12px;text-align:center;">Expira em <strong style="color:#f0f0f0;">15 minutos</strong>.</p>
         <p style="color:#555;font-size:11px;text-align:center;margin-top:20px;">Se você não solicitou, ignore este email.</p>
-      </div>`,
-  });
-  return true;
+      </div>`;
+  // 1) Brevo (HTTP) — fura o bloqueio SMTP do Railway.
+  if (BREVO_API_KEY) { const ok = await sendViaBrevo(email, subject, html); if (ok) return true; }
+  // 2) Fallback SMTP (timeout curto p/ não pendurar caso a porta esteja bloqueada).
+  if (!SMTP_USER || !SMTP_PASS) { console.error('[Auth] sem provedor de e-mail (BREVO/SMTP)'); return false; }
+  try {
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+      connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 8000,
+    });
+    await transporter.sendMail({ from: `"Meal Time Painel" <${SMTP_USER}>`, to: email, subject, html });
+    return true;
+  } catch (e) { console.error('[mail] SMTP erro:', e.message); return false; }
 }
 
 // ═══════════════════════════════════════
