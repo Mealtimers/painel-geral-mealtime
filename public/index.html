@@ -659,6 +659,56 @@
       padding: 4px 16px 12px;
       border-top: 1px solid rgba(255,255,255,0.04);
     }
+
+    /* Cabeçalho de colunas */
+    .ci-cols {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .ci-col-name,
+    .ci-col-hdr {
+      font-size: 0.62rem;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    .ci-col-nums {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .ci-col-sep {
+      color: var(--text-tertiary);
+      opacity: 0.5;
+      font-size: 0.7rem;
+    }
+
+    /* Cabeçalho de categoria */
+    .ci-cat-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0 4px;
+      margin-top: 4px;
+      font-size: 0.66rem;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    .ci-cat-head:first-of-type { margin-top: 6px; }
+    .ci-cat-count {
+      background: rgba(255,255,255,0.06);
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-size: 0.6rem;
+      font-weight: 700;
+    }
+
     .ci-item {
       display: flex;
       justify-content: space-between;
@@ -1508,25 +1558,58 @@
           '<div class="ci-sub ci-ok">✓ Todos acima do mínimo</div></div>';
         return;
       }
-      var rows = items.map(function(it){
-        var deficit = it.deficit;
-        return ''+
-          '<div class="ci-item">'+
-            '<span class="ci-item-name">'+ escHtml(it.nome || 'Sem nome') +'</span>'+
-            '<span class="ci-item-nums">'+
-              '<span class="ci-saldo">'+ it.saldoAtual +'</span>'+
-              '<span class="ci-sep">/</span>'+
-              '<span class="ci-min">'+ it.estoqueMinimo +'</span>'+
-              '<span class="ci-def">−'+ deficit +'</span>'+
-            '</span>'+
+      // Agrupa por categoria (mantendo a ordem original recebida do backend)
+      var grupos = {};
+      var ordemCats = [];
+      items.forEach(function(it){
+        var cat = it.categoriaNome || 'Sem categoria';
+        if (!grupos[cat]) { grupos[cat] = []; ordemCats.push(cat); }
+        grupos[cat].push(it);
+      });
+      // Alfabético mas "Sem categoria" no final
+      ordemCats.sort(function(a, b){
+        if (a === 'Sem categoria') return 1;
+        if (b === 'Sem categoria') return -1;
+        return a.localeCompare(b, 'pt-BR');
+      });
+
+      var listHtml =
+        '<div class="ci-cols">'+
+          '<span class="ci-col-name">Item</span>'+
+          '<span class="ci-col-nums">'+
+            '<span class="ci-col-hdr">Estoque</span>'+
+            '<span class="ci-col-sep">/</span>'+
+            '<span class="ci-col-hdr">Mín.</span>'+
+          '</span>'+
+        '</div>';
+
+      ordemCats.forEach(function(cat){
+        var itensCat = grupos[cat];
+        listHtml +=
+          '<div class="ci-cat-head">'+
+            '<span>'+ escHtml(cat) +'</span>'+
+            '<span class="ci-cat-count">'+ itensCat.length +'</span>'+
           '</div>';
-      }).join('');
+        itensCat.forEach(function(it){
+          listHtml +=
+            '<div class="ci-item">'+
+              '<span class="ci-item-name">'+ escHtml(it.nome || 'Sem nome') +'</span>'+
+              '<span class="ci-item-nums">'+
+                '<span class="ci-saldo">'+ it.saldoAtual +'</span>'+
+                '<span class="ci-sep">/</span>'+
+                '<span class="ci-min">'+ it.estoqueMinimo +'</span>'+
+                '<span class="ci-def">−'+ it.deficit +'</span>'+
+              '</span>'+
+            '</div>';
+        });
+      });
+
       el.innerHTML =
         '<div class="ci-head" onclick="toggleComprasInsumos()">'+
           '<div class="ci-title">📦 Compras Insumos Fábrica <span class="ci-badge">'+ total +'</span></div>'+
           '<div class="ci-toggle">'+ chevronSvg +'</div>'+
         '</div>'+
-        '<div class="ci-body"><div class="ci-list">' + rows + '</div></div>';
+        '<div class="ci-body"><div class="ci-list">' + listHtml + '</div></div>';
       if (wasExpanded) el.classList.add('expanded');
     }).catch(function(err){
       el.classList.remove('expanded');
