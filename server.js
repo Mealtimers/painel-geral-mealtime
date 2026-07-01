@@ -52,6 +52,10 @@ const BI_API_URL = process.env.BI_API_URL || 'https://bi-bling-production.up.rai
 const BI_ADMIN_USER = process.env.BI_ADMIN_USER || '';
 const BI_ADMIN_PASS = process.env.BI_ADMIN_PASS || '';
 
+// ── Estoque Fabrica config (integração cross-app) ──
+const ESTOQUE_FABRICA_URL = process.env.ESTOQUE_FABRICA_URL || 'https://estoque.mealtime.com.br';
+const ESTOQUE_FABRICA_API_KEY = process.env.ESTOQUE_FABRICA_API_KEY || '';
+
 // ── Data dir ──
 const DATA_DIR = process.env.DATA_DIR || './data';
 
@@ -512,6 +516,39 @@ async function fetchPedidosResumo() {
   return data;
 }
 
+// ── Compras Insumos Fabrica: proxy pro Estoque Fabrica ──────────────
+let comprasInsumosCache = { data: null, ts: 0 };
+const COMPRAS_INSUMOS_TTL = 60_000; // 60s
+
+async function fetchComprasInsumosFabrica({ force = false } = {}) {
+  if (!force && comprasInsumosCache.data && (Date.now() - comprasInsumosCache.ts) < COMPRAS_INSUMOS_TTL) {
+    return { ...comprasInsumosCache.data, cached: true };
+  }
+  if (!ESTOQUE_FABRICA_API_KEY) {
+    return { ok: false, error: 'ESTOQUE_FABRICA_API_KEY nao configurada no painel-geral.', total: 0, items: [] };
+  }
+  const url = `${ESTOQUE_FABRICA_URL.replace(/\/$/, '')}/api/integration/insumos-abaixo-minimo`;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'X-Internal-Api-Key': ESTOQUE_FABRICA_API_KEY, Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      return { ok: false, error: `Estoque Fabrica retornou ${res.status}: ${txt.slice(0, 200)}`, total: 0, items: [] };
+    }
+    const data = await res.json();
+    comprasInsumosCache = { data, ts: Date.now() };
+    return { ...data, cached: false };
+  } catch (err) {
+    return { ok: false, error: `Falha ao conectar no Estoque Fabrica: ${err.message}`, total: 0, items: [] };
+  }
+}
+
 // Overview unificado (lê dashboard.overview_today no Supabase).
 // View materializada — refresh agendado via pg_cron a cada 5min.
 async function fetchOverviewUnificado() {
@@ -802,6 +839,18 @@ const server = http.createServer(async (req, res) => {
       const user = requireAuth(req, res); if (!user) return;
       try { return jsonRes(res, 200, await fetchOverviewUnificado()); }
       catch (err) { console.error('[Overview]', err.message); return jsonRes(res, 500, { error: 'Erro overview' }); }
+    }
+
+    if (url === '/api/compras-insumos-fabrica') {
+      const user = requireAuth(req, res); if (!user) return;
+      const force = (req.url.split('?')[1] || '').includes('force=1');
+      try {
+        const data = await fetchComprasInsumosFabrica({ force });
+        return jsonRes(res, data.ok === false ? 502 : 200, data);
+      } catch (err) {
+        console.error('[ComprasInsumos]', err.message);
+        return jsonRes(res, 500, { ok: false, error: 'Erro compras insumos', items: [], total: 0 });
+      }
     }
 
     return jsonRes(res, 404, { error: 'Endpoint não encontrado' });

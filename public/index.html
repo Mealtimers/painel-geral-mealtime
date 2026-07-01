@@ -597,6 +597,171 @@
       font-size: 0.74rem;
     }
 
+    /* ═══ COMPRAS INSUMOS FÁBRICA ═══ */
+    .dash-compras-insumos {
+      background: linear-gradient(135deg, rgba(239,68,68,0.06), rgba(251,146,60,0.04));
+      border: 1px solid rgba(239,68,68,0.20);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+    .ci-head-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .ci-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ci-badge {
+      display: inline-block;
+      min-width: 22px;
+      padding: 2px 8px;
+      background: #ef4444;
+      color: white;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-align: center;
+      animation: ci-pulse 2s infinite;
+    }
+    @keyframes ci-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+    .ci-sub-line {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 0.72rem;
+      color: var(--text-tertiary);
+      flex-wrap: wrap;
+    }
+    .ci-total {
+      color: #34d399;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .ci-updated { font-size: 0.68rem; }
+
+    .ci-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ci-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 10px;
+      transition: background 0.15s;
+    }
+    .ci-row:hover {
+      background: rgba(255,255,255,0.04);
+    }
+    .ci-row-name { flex: 1; min-width: 0; }
+    .ci-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ci-sku {
+      font-size: 0.68rem;
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+
+    .ci-row-nums {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .ci-num-col {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      min-width: 44px;
+    }
+    .ci-bar-col { min-width: 90px; }
+    .ci-num-lbl {
+      font-size: 0.6rem;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 2px;
+    }
+    .ci-num {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+    .ci-danger { color: #f87171; }
+    .ci-value { color: #34d399; }
+
+    .ci-bar-wrap {
+      width: 100%;
+      height: 5px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .ci-bar-fill { height: 100%; transition: width 0.3s; }
+    .ci-bar-crit { background: #ef4444; }
+    .ci-bar-warn { background: #f59e0b; }
+    .ci-bar-ok { background: #10b981; }
+
+    .ci-empty {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-tertiary);
+      font-size: 0.76rem;
+    }
+    .ci-empty.ci-ok {
+      color: #86efac;
+    }
+
+    .ci-load {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-tertiary);
+      font-size: 0.74rem;
+    }
+
+    .ci-footer {
+      margin-top: 12px;
+      text-align: right;
+    }
+    .ci-link {
+      font-size: 0.72rem;
+      color: var(--mt-green, #6dcf6d);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .ci-link:hover { text-decoration: underline; }
+
+    @media (max-width: 640px) {
+      .ci-row-nums { flex-wrap: wrap; gap: 8px; }
+      .ci-num-col { min-width: 40px; }
+      .ci-bar-col { min-width: 80px; }
+    }
+
     /* Verse */
     .dash-verse {
       text-align: center;
@@ -952,6 +1117,10 @@
         <div class="d-card anim" id="alertFabrica" style="animation-delay:.14s">
           <div class="d-load">Carregando fábrica...</div>
         </div>
+      </div>
+
+      <div class="dash-compras-insumos anim" id="comprasInsumos" style="animation-delay:.16s">
+        <div class="ci-load">Carregando insumos abaixo do mínimo...</div>
       </div>
 
       <div class="dash-nl anim" id="newsletter" style="animation-delay:.15s">
@@ -1372,11 +1541,81 @@
     document.getElementById('verseRef').textContent = v.r;
   })();
 
+  /* ═══ COMPRAS INSUMOS FÁBRICA ═══ */
+  function fmtBRL(v){
+    if (v == null || isNaN(v)) return '—';
+    return 'R$ ' + Number(v).toFixed(2).replace('.', ',');
+  }
+  function renderComprasInsumos(){
+    var el = document.getElementById('comprasInsumos');
+    if (!el) return;
+    authFetch('/api/compras-insumos-fabrica').then(function(d){
+      if (!d || d.ok === false){
+        el.innerHTML =
+          '<div class="ci-head-line"><div class="ci-title">📦 Compras Insumos Fábrica</div></div>'+
+          '<div class="ci-empty">' + (d && d.error ? d.error : 'Não configurado. Setar ESTOQUE_FABRICA_API_KEY no Railway.') + '</div>';
+        return;
+      }
+      var total = d.total || 0;
+      var items = d.items || [];
+      var valorTotal = items.reduce(function(s, it){ return s + (Number(it.precoCusto)||0) * (Number(it.deficit)||0); }, 0);
+      var geradoEm = d.geradoEm ? new Date(d.geradoEm).toLocaleString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
+      if (total === 0){
+        el.innerHTML =
+          '<div class="ci-head-line"><div class="ci-title">📦 Compras Insumos Fábrica</div><div class="ci-sub-line">' + (geradoEm ? 'Atualizado ' + geradoEm : '') + '</div></div>'+
+          '<div class="ci-empty ci-ok">✓ Todos os insumos estão acima do estoque mínimo.</div>';
+        return;
+      }
+      var rows = items.map(function(it){
+        var pct = it.percentualCoberto || 0;
+        var barClass = pct < 25 ? 'ci-bar-crit' : pct < 50 ? 'ci-bar-warn' : 'ci-bar-ok';
+        var valorRepor = (Number(it.precoCusto)||0) * (Number(it.deficit)||0);
+        return ''+
+          '<div class="ci-row">'+
+            '<div class="ci-row-name">'+
+              '<div class="ci-name">'+ escHtml(it.nome || 'Sem nome') +'</div>'+
+              '<div class="ci-sku">'+ escHtml(it.sku || '') + (it.unidade ? ' · ' + escHtml(it.unidade) : '') +'</div>'+
+            '</div>'+
+            '<div class="ci-row-nums">'+
+              '<div class="ci-num-col"><span class="ci-num-lbl">Saldo</span><span class="ci-num ci-danger">'+ it.saldoAtual +'</span></div>'+
+              '<div class="ci-num-col"><span class="ci-num-lbl">Mín.</span><span class="ci-num">'+ it.estoqueMinimo +'</span></div>'+
+              '<div class="ci-num-col"><span class="ci-num-lbl">Déficit</span><span class="ci-num ci-danger">-'+ it.deficit +'</span></div>'+
+              '<div class="ci-num-col ci-bar-col">'+
+                '<span class="ci-num-lbl">'+ pct +'% coberto</span>'+
+                '<div class="ci-bar-wrap"><div class="ci-bar-fill '+barClass+'" style="width:'+ Math.min(100,pct) +'%"></div></div>'+
+              '</div>'+
+              (valorRepor > 0 ? '<div class="ci-num-col"><span class="ci-num-lbl">Repor</span><span class="ci-num ci-value">'+ fmtBRL(valorRepor) +'</span></div>' : '') +
+            '</div>'+
+          '</div>';
+      }).join('');
+      el.innerHTML =
+        '<div class="ci-head-line">'+
+          '<div class="ci-title">📦 Compras Insumos Fábrica <span class="ci-badge">'+ total +'</span></div>'+
+          '<div class="ci-sub-line">' +
+            (valorTotal > 0 ? '<span class="ci-total">Total: ' + fmtBRL(valorTotal) + '</span>' : '') +
+            (geradoEm ? '<span class="ci-updated">Atualizado ' + geradoEm + '</span>' : '') +
+          '</div>'+
+        '</div>'+
+        '<div class="ci-list">' + rows + '</div>'+
+        '<div class="ci-footer">'+
+          '<a href="https://estoque.mealtime.com.br" target="_blank" rel="noopener" class="ci-link">Abrir Estoque Fábrica →</a>'+
+        '</div>';
+    }).catch(function(err){
+      el.innerHTML =
+        '<div class="ci-head-line"><div class="ci-title">📦 Compras Insumos Fábrica</div></div>'+
+        '<div class="ci-empty">Erro ao carregar: ' + (err && err.message ? err.message : 'desconhecido') + '</div>';
+    });
+  }
+  function escHtml(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  }); }
+
   /* ═══ INIT + AUTO-REFRESH 2min ═══ */
   renderContas();
   renderPedidos();
   renderDieta();
   renderFabrica();
+  renderComprasInsumos();
   renderNewsletter();
   setInterval(function(){
     overviewPromise = null; // invalida cache do overview unificado
@@ -1384,6 +1623,7 @@
     renderPedidos();
     renderDieta();
     renderFabrica();
+    renderComprasInsumos();
     renderNewsletter();
   }, 2*60*1000);
 
