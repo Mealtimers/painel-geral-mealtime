@@ -285,7 +285,9 @@ function sanitizeUser(u) {
 // ═══════════════════════════════════════
 
 function generateToken(user) {
-  return jwt.sign({ id: user.id, user: user.usuario, perfil: user.perfil, iat: Math.floor(Date.now() / 1000) }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+  // Inclui aliases `role` e `usuario` além de `perfil`/`user` para compatibilidade
+  // com apps-filho que checam `role` (ex.: BI) — corrige SSO 403 "exclusiva de admin".
+  return jwt.sign({ id: user.id, user: user.usuario, usuario: user.usuario, perfil: user.perfil, role: user.perfil, iat: Math.floor(Date.now() / 1000) }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
 }
 
 function verifyToken(token) {
