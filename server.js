@@ -631,6 +631,12 @@ function requireAdmin(req, res) {
 // ═══════════════════════════════════════
 
 const server = http.createServer(async (req, res) => {
+  // Headers de segurança em toda resposta (mesclados no writeHead pelo Node)
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
   const url = req.url.split('?')[0];
 
   if (req.method === 'OPTIONS') {
