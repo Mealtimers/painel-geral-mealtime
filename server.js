@@ -320,6 +320,60 @@ function getAuthUser(req) {
 // Reset tokens (in memory, 15 min)
 const resetTokens = new Map();
 
+/* ═══════════════════ 2FA por email + dispositivo confiável (30d) ═══════════════════ */
+const TWOFA_ENABLED = process.env.TWOFA_ENABLED !== 'false'; // ligado por padrão
+const twofaPending = new Map(); // pendingToken -> { userId, codeHash, expiresAt, attempts }
+const TWOFA_TTL_MS = 10 * 60 * 1000;
+const TD_MAX_AGE_SEC = 30 * 24 * 3600; // dispositivo confiável: 30 dias
+
+function sha256(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }
+
+function maskEmailPB(email) {
+  const [u, d] = String(email || '').split('@');
+  if (!d) return '***';
+  return (u.length <= 3 ? u[0] : u.slice(0, 3)) + '***@' + d;
+}
+
+// Cookie de dispositivo confiável = JWT curto {uid, td} válido 30 dias
+function isTrustedDevice(req, userId) {
+  const m = (req.headers['cookie'] || '').match(/painel_td=([^;]+)/);
+  if (!m) return false;
+  try { const d = jwt.verify(m[1], JWT_SECRET); return d && d.td === true && d.uid === userId; }
+  catch { return false; }
+}
+function trustedDeviceCookie(userId) {
+  const token = jwt.sign({ uid: userId, td: true }, JWT_SECRET, { expiresIn: '30d' });
+  const parts = [`painel_td=${token}`, 'HttpOnly', 'SameSite=Lax', 'Path=/', `Max-Age=${TD_MAX_AGE_SEC}`];
+  if ((process.env.APP_BASE_URL || '').startsWith('https://')) parts.push('Secure');
+  return parts.join('; ');
+}
+
+async function send2faEmail(email, code) {
+  const subject = 'Código de acesso — Painel Geral';
+  const html = `
+      <div style="font-family:Inter,Arial,sans-serif;max-width:460px;margin:0 auto;padding:32px;background:#141518;color:#f0f0f0;border-radius:12px;">
+        <div style="text-align:center;margin-bottom:24px;">
+          <img src="https://www.mealtime.com.br/mealtime/logo-avatar-192.png" width="48" height="48" style="border-radius:12px;">
+          <h2 style="margin:12px 0 4px;color:#f0f0f0;font-size:18px;">Meal Time — Painel Geral</h2>
+          <p style="color:#888;font-size:13px;margin:0;">Verificação em duas etapas</p>
+        </div>
+        <div style="background:#1a1b1f;padding:20px;border-radius:10px;text-align:center;margin-bottom:20px;">
+          <p style="color:#aaa;font-size:13px;margin:0 0 12px;">Seu código de acesso:</p>
+          <div style="font-size:32px;font-weight:800;letter-spacing:8px;color:#BC2026;font-family:monospace;">${code}</div>
+        </div>
+        <p style="color:#888;font-size:12px;text-align:center;">Expira em <strong style="color:#f0f0f0;">10 minutos</strong>.</p>
+        <p style="color:#555;font-size:11px;text-align:center;margin-top:20px;">Se não foi você tentando entrar, troque sua senha imediatamente.</p>
+      </div>`;
+  if (BREVO_API_KEY) { const ok = await sendViaBrevo(email, subject, html); if (ok) return true; }
+  if (SMTP_USER && SMTP_PASS) {
+    try {
+      const t = nodemailer.createTransport({ host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465, auth: { user: SMTP_USER, pass: SMTP_PASS }, connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 8000 });
+      await t.sendMail({ from: `"Meal Time Painel" <${SMTP_USER}>`, to: email, subject, html }); return true;
+    } catch (e) { console.error('[2fa] SMTP erro:', e.message); }
+  }
+  return false;
+}
+
 async function sendRecoveryEmail(email, resetCode) {
   const subject = 'Recuperação de Senha — Painel Geral';
   const html = `
@@ -669,13 +723,43 @@ const server = http.createServer(async (req, res) => {
     if (!usuario || !senha) return jsonRes(res, 400, { error: 'Usuário e senha obrigatórios' });
 
     const user = findUser(usuario);
-    if (user && user.senha === hashPassword(senha)) {
-      console.log(`[Auth] Login OK: ${usuario}`);
-      const token = generateToken(user);
-      return jsonRes(res, 200, { ok: true, token, user: sanitizeUser(user) });
+    if (!(user && user.senha === hashPassword(senha))) {
+      console.log(`[Auth] Login falhou: ${usuario}`);
+      return jsonRes(res, 401, { ok: false, error: 'Usuário ou senha incorretos' });
     }
-    console.log(`[Auth] Login falhou: ${usuario}`);
-    return jsonRes(res, 401, { ok: false, error: 'Usuário ou senha incorretos' });
+
+    // 2FA por email — exceto em dispositivo já confiável (lembrado por 30 dias)
+    if (TWOFA_ENABLED && !isTrustedDevice(req, user.id)) {
+      const code = crypto.randomInt(100000, 1000000).toString();
+      const pending = crypto.randomBytes(24).toString('hex');
+      for (const [k, v] of twofaPending) { if (Date.now() > v.expiresAt) twofaPending.delete(k); }
+      twofaPending.set(pending, { userId: user.id, codeHash: sha256(code), expiresAt: Date.now() + TWOFA_TTL_MS, attempts: 0 });
+      const dest = user.email || RECOVER_EMAIL;
+      try { await send2faEmail(dest, code); console.log(`[2fa] código enviado para ${maskEmailPB(dest)}`); }
+      catch (e) { console.error('[2fa] erro email:', e.message); }
+      return jsonRes(res, 200, { ok: true, twofa: true, pending, email: maskEmailPB(dest) });
+    }
+
+    console.log(`[Auth] Login OK: ${usuario}`);
+    const token = generateToken(user);
+    return jsonRes(res, 200, { ok: true, token, user: sanitizeUser(user) });
+  }
+
+  if (url === '/api/auth/2fa-verify' && req.method === 'POST') {
+    const body = await readBody(req);
+    const { pending, code, remember } = body;
+    const entry = pending ? twofaPending.get(pending) : null;
+    if (!entry || Date.now() > entry.expiresAt) { if (entry) twofaPending.delete(pending); return jsonRes(res, 400, { error: 'Código expirado. Faça login novamente.' }); }
+    if (entry.attempts >= 5) { twofaPending.delete(pending); return jsonRes(res, 429, { error: 'Muitas tentativas. Faça login novamente.' }); }
+    entry.attempts++;
+    if (sha256(String(code || '').trim()) !== entry.codeHash) return jsonRes(res, 401, { error: 'Código incorreto.' });
+    const user = findUserById(entry.userId);
+    twofaPending.delete(pending);
+    if (!user) return jsonRes(res, 400, { error: 'Usuário não encontrado' });
+    if (remember) res.setHeader('Set-Cookie', trustedDeviceCookie(user.id));
+    const token = generateToken(user);
+    console.log(`[2fa] verificado — login OK: ${user.usuario}`);
+    return jsonRes(res, 200, { ok: true, token, user: sanitizeUser(user) });
   }
 
   if (url === '/api/auth/verify') {
@@ -734,7 +818,7 @@ const server = http.createServer(async (req, res) => {
 
   if (url.startsWith('/api/')) {
     // Skip public auth endpoints
-    if (['/api/auth/login','/api/auth/verify','/api/auth/recover','/api/auth/reset'].includes(url)) return;
+    if (['/api/auth/login','/api/auth/2fa-verify','/api/auth/verify','/api/auth/recover','/api/auth/reset'].includes(url)) return;
 
     // ── User profile ──
 

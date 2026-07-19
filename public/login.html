@@ -98,6 +98,25 @@
       <a class="forgot-link" onclick="showStep('stepRecover')">Esqueci minha senha</a>
     </div>
 
+    <!-- STEP 2FA: CÓDIGO DE ACESSO -->
+    <div class="step" id="step2fa">
+      <div class="back-row" onclick="showStep('stepLogin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar ao login</div>
+      <h2>Verificacao em duas etapas</h2>
+      <p class="email-hint">Enviamos um codigo de 6 digitos para<br><strong id="twofaEmail"></strong></p>
+      <div class="error-msg" id="twofaError"></div>
+      <form id="twofaForm">
+        <div class="field">
+          <label for="twofaCode">Codigo de acesso</label>
+          <input type="text" id="twofaCode" class="code-input" placeholder="000000" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" required autofocus>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-tertiary);cursor:pointer;margin-bottom:14px">
+          <input type="checkbox" id="twofaRemember" checked style="width:16px;height:16px;cursor:pointer">
+          Confiar neste dispositivo por 30 dias
+        </label>
+        <button type="submit" class="btn" id="twofaBtn">Entrar</button>
+      </form>
+    </div>
+
     <!-- STEP 2: RECOVER -->
     <div class="step" id="stepRecover">
       <div class="back-row" onclick="showStep('stepLogin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Voltar ao login</div>
@@ -156,9 +175,26 @@ document.getElementById('loginForm').addEventListener('submit',function(e){
   fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usuario:u,senha:s})})
   .then(function(r){return r.json()}).then(function(d){
     setLoading('loginBtn',false);
+    if(d.twofa){window._twofaPending=d.pending;document.getElementById('twofaEmail').textContent=d.email||'seu email';document.getElementById('twofaCode').value='';showStep('step2fa');setTimeout(function(){document.getElementById('twofaCode').focus()},100);return}
     if(d.ok&&d.token){localStorage.setItem('painel_token',d.token);document.cookie='painel_token='+d.token+'; path=/; max-age=86400; SameSite=Lax';window.location.href='/'}
     else showError('loginError',d.error||'Erro ao fazer login')
   }).catch(function(){setLoading('loginBtn',false);showError('loginError','Erro de conexao')})
+});
+
+// 2FA — verificar codigo de acesso
+document.getElementById('twofaForm').addEventListener('submit',function(e){
+  e.preventDefault();
+  var code=document.getElementById('twofaCode').value.trim();
+  var remember=document.getElementById('twofaRemember').checked;
+  if(!code||code.length!==6)return showError('twofaError','Codigo de 6 digitos');
+  if(!window._twofaPending)return showError('twofaError','Sessao expirada. Faca login de novo.');
+  setLoading('twofaBtn',true);document.getElementById('twofaError').style.display='none';
+  fetch('/api/auth/2fa-verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pending:window._twofaPending,code:code,remember:remember})})
+  .then(function(r){return r.json()}).then(function(d){
+    setLoading('twofaBtn',false);
+    if(d.ok&&d.token){localStorage.setItem('painel_token',d.token);document.cookie='painel_token='+d.token+'; path=/; max-age=86400; SameSite=Lax';window.location.href='/'}
+    else showError('twofaError',d.error||'Codigo invalido')
+  }).catch(function(){setLoading('twofaBtn',false);showError('twofaError','Erro de conexao')})
 });
 
 // RECOVER
