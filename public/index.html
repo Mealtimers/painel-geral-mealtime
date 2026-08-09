@@ -613,7 +613,18 @@
       padding: 12px 16px;
       cursor: pointer;
       user-select: none;
+      flex-wrap: wrap;
     }
+    /* Data da última conferência de insumos — linha própria, largura total */
+    .ci-conf {
+      flex-basis: 100%;
+      font-size: 0.66rem;
+      color: var(--text-tertiary);
+      margin-top: -2px;
+    }
+    .ci-conf-ok   { color: #86efac; }
+    .ci-conf-warn { color: #fcd34d; }
+    .ci-conf-old  { color: #fca5a5; }
     .ci-title {
       font-size: 0.82rem;
       font-weight: 600;
@@ -1536,6 +1547,15 @@
     if (v == null || isNaN(v)) return '—';
     return 'R$ ' + Number(v).toFixed(2).replace('.', ',');
   }
+  function fmtUltimaConf(ts){
+    if (!ts) return '<div class="ci-conf ci-conf-old">Conferência insumos: nunca registrada</div>';
+    var d = new Date(ts);
+    var dias = Math.floor((Date.now() - d.getTime()) / 86400000);
+    var rel = dias <= 0 ? 'hoje' : dias === 1 ? 'ontem' : 'há ' + dias + ' dias';
+    var cls = dias <= 3 ? 'ci-conf-ok' : dias <= 7 ? 'ci-conf-warn' : 'ci-conf-old';
+    var quando = d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    return '<div class="ci-conf ' + cls + '">Conferência insumos: ' + quando + ' — ' + rel + '</div>';
+  }
   function renderComprasInsumos(){
     var el = document.getElementById('comprasInsumos');
     if (!el) return;
@@ -1555,7 +1575,8 @@
         el.classList.remove('expanded');
         el.innerHTML =
           '<div class="ci-head"><div class="ci-title">📦 Compras Insumos Fábrica</div>'+
-          '<div class="ci-sub ci-ok">✓ Todos acima do mínimo</div></div>';
+          '<div class="ci-sub ci-ok">✓ Todos acima do mínimo</div>'+
+          fmtUltimaConf(d.ultimaConferenciaInsumos) + '</div>';
         return;
       }
       // Agrupa por categoria (mantendo a ordem original recebida do backend)
@@ -1608,6 +1629,7 @@
         '<div class="ci-head" onclick="toggleComprasInsumos()">'+
           '<div class="ci-title">📦 Compras Insumos Fábrica <span class="ci-badge">'+ total +'</span></div>'+
           '<div class="ci-toggle">'+ chevronSvg +'</div>'+
+          fmtUltimaConf(d.ultimaConferenciaInsumos) +
         '</div>'+
         '<div class="ci-body"><div class="ci-list">' + listHtml + '</div></div>';
       if (wasExpanded) el.classList.add('expanded');
