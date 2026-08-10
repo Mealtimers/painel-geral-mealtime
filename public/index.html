@@ -689,13 +689,34 @@
     }
 
     .mt-card-desc {
-      font-size: 0.68rem;
-      line-height: 1.5;
+      font-size: 0.72rem;
+      line-height: 1.55;
       color: var(--text-secondary);
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+    }
+
+    .mt-card-refs {
+      font-size: 0.62rem;
+      line-height: 1.4;
+      color: var(--text-tertiary);
+      margin-top: 4px;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(255,255,255,0.06);
+    }
+
+    .mt-card-refs-label {
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 700;
+      color: var(--mt-red);
+      opacity: 0.65;
+      margin-right: 4px;
+    }
+
+    .mt-card-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px;
     }
 
     .mt-tags {
@@ -1262,10 +1283,6 @@
         <div class="mt-load">Carregando mentor diário...</div>
       </div>
 
-      <div class="dash-nl anim" id="newsletter" style="animation-delay:.17s">
-        <div class="nl-load">Carregando newsletter...</div>
-      </div>
-
       <div class="dash-verse anim" style="animation-delay:.2s">
         <div class="verse-text" id="verseText"></div>
         <div class="verse-ref" id="verseRef"></div>
@@ -1602,53 +1619,6 @@
     });
   }
 
-  /* ═══ NEWSLETTER ═══ */
-  function renderNewsletter(){
-    var el = document.getElementById('newsletter');
-    authFetch('/api/newsletter')
-      .then(function(d){
-        if(d.error) throw new Error(d.error);
-        var items=[
-          {m:d.manchete1,s:d.resumo1},{m:d.manchete2,s:d.resumo2},{m:d.manchete3,s:d.resumo3}
-        ].filter(function(x){return x.m;});
-        if(!items.length) throw new Error('vazio');
-
-        var url = d.notionUrl||'#';
-        var df = '';
-        if(d.data){
-          var dt=new Date(d.data+'T12:00:00');
-          var ds=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
-          var ms=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-          df=ds[dt.getDay()]+', '+dt.getDate()+' de '+ms[dt.getMonth()]+' de '+dt.getFullYear();
-        }
-
-        var cards='';
-        items.forEach(function(it,i){
-          var desc=it.s?'<div class="nl-card-desc">'+it.s+'</div>':'';
-          cards+='<a class="nl-card" href="'+url+'" target="_blank" rel="noopener">'+
-            '<div class="nl-card-n">'+(i+1)+'</div>'+
-            '<div class="nl-card-title">'+it.m+'</div>'+desc+'</a>';
-        });
-
-        var tg='';
-        if(d.topicos&&d.topicos.length){
-          tg='<div class="nl-tags">';
-          d.topicos.forEach(function(t){ tg+='<span class="nl-tag">'+t+'</span>'; });
-          tg+='</div>';
-        }
-
-        var ft='';
-        if(d.notionUrl){
-          ft='<a class="nl-link" href="'+d.notionUrl+'" target="_blank" rel="noopener">Ler completa '+ar+'</a>';
-        }
-
-        el.innerHTML=
-          '<div class="nl-header"><div class="nl-header-left"><div class="nl-icon">📰</div><div><div class="nl-title">Newsletter</div><div class="nl-date-label">'+df+'</div></div></div>'+ft+'</div>'+
-          '<div class="nl-grid">'+cards+'</div>'+tg;
-      })
-      .catch(function(){ el.innerHTML='<div class="nl-load">Newsletter indisponivel</div>'; });
-  }
-
   /* ═══ MENTOR DIÁRIO ═══ */
   function renderMentor(){
     var el = document.getElementById('mentorDiario');
@@ -1672,10 +1642,11 @@
 
         var cards='';
         items.forEach(function(it){
-          var desc=it.desc?'<div class="mt-card-desc">'+it.desc+'</div>':'<div class="mt-card-desc">'+it.s+'</div>';
+          var desc = it.desc ? '<div class="mt-card-desc">'+it.desc+'</div>' : '';
+          var refs = it.s ? '<div class="mt-card-refs"><span class="mt-card-refs-label">Referências</span>'+it.s+'</div>' : '';
           cards+='<a class="mt-card" href="'+url+'" target="_blank" rel="noopener">'+
-            '<div class="mt-card-n">'+it.icon+'</div>'+
-            '<div class="mt-card-title">'+it.t+'</div>'+desc+'</a>';
+            '<div class="mt-card-head"><div class="mt-card-n">'+it.icon+'</div><div class="mt-card-title">'+it.t+'</div></div>'+
+            desc+refs+'</a>';
         });
 
         var tg='';
@@ -1840,7 +1811,6 @@
   renderDieta();
   renderFabrica();
   renderComprasInsumos();
-  renderNewsletter();
   renderMentor();
   setInterval(function(){
     overviewPromise = null; // invalida cache do overview unificado
@@ -1849,7 +1819,6 @@
     renderDieta();
     renderFabrica();
     renderComprasInsumos();
-    renderNewsletter();
     renderMentor();
   }, 2*60*1000);
 
