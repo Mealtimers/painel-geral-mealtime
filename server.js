@@ -10,6 +10,7 @@ const supabase = require('./lib/supabaseClient');
 const PORT = process.env.PORT || 3050;
 const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
 const NOTION_DB_ID = process.env.NOTION_DB_ID || '12bb62ac-a681-4f41-b6e5-87ecaa1151da';
+const MENTOR_DB_ID = process.env.MENTOR_DB_ID || '95bef7c6-b4fe-4ebe-825d-47d1d4d7290d';
 
 // ── Auth config ──
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
@@ -411,6 +412,7 @@ async function sendRecoveryEmail(email, resetCode) {
 
 const CACHE_TTL = 2 * 60 * 1000;
 let newsletterCache = { data: null, ts: 0 };
+let mentorCache = { data: null, ts: 0 };
 let contasCache = { data: null, ts: 0 };
 let pedidosCache = { data: null, ts: 0 };
 let overviewCache = { data: null, ts: 0 };
@@ -465,6 +467,32 @@ async function fetchNewsletter() {
     topicos: getTopics(props['Tópicos']), notionUrl: page.url || '',
   };
   newsletterCache = { data, ts: Date.now() };
+  return data;
+}
+
+async function fetchMentor() {
+  if (mentorCache.data && Date.now() - mentorCache.ts < CACHE_TTL) return mentorCache.data;
+  const result = await notionRequest(`/v1/databases/${MENTOR_DB_ID}/query`, {
+    sorts: [{ property: 'Data', direction: 'descending' }], page_size: 1,
+  });
+  if (!result.results || !result.results.length) return null;
+  const page = result.results[0];
+  const props = page.properties;
+  const getText = (p) => {
+    if (!p) return '';
+    if (p.type === 'title') return (p.title || []).map(t => t.plain_text).join('');
+    if (p.type === 'rich_text') return (p.rich_text || []).map(t => t.plain_text).join('');
+    return '';
+  };
+  const getDate = (p) => (!p || p.type !== 'date' || !p.date) ? null : p.date.start;
+  const getTopics = (p) => (!p || p.type !== 'multi_select') ? [] : (p.multi_select || []).map(t => t.name);
+  const data = {
+    edicao: getText(props['Edição']), data: getDate(props['Data']),
+    nomesVendas: getText(props['Nomes Vendas']), nomesCozinha: getText(props['Nomes Cozinha']),
+    destaqueVendas: getText(props['Destaque Vendas']), destaqueCozinha: getText(props['Destaque Cozinha']),
+    topicos: getTopics(props['Tópicos']), notionUrl: page.url || '',
+  };
+  mentorCache = { data, ts: Date.now() };
   return data;
 }
 
@@ -690,6 +718,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy', "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests");
 
   const url = req.url.split('?')[0];
 
@@ -911,6 +940,16 @@ const server = http.createServer(async (req, res) => {
         if (!data) return jsonRes(res, 404, { error: 'Nenhuma edição' });
         return jsonRes(res, 200, data);
       } catch (err) { console.error('[Newsletter]', err.message); return jsonRes(res, 500, { error: 'Erro newsletter' }); }
+    }
+
+    if (url === '/api/mentor') {
+      const user = requireAuth(req, res); if (!user) return;
+      if (!NOTION_API_KEY) return jsonRes(res, 503, { error: 'NOTION_API_KEY não configurada' });
+      try {
+        const data = await fetchMentor();
+        if (!data) return jsonRes(res, 404, { error: 'Nenhuma edição' });
+        return jsonRes(res, 200, data);
+      } catch (err) { console.error('[Mentor]', err.message); return jsonRes(res, 500, { error: 'Erro mentor' }); }
     }
 
     if (url === '/api/contas-resumo') {

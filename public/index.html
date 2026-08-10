@@ -597,6 +597,133 @@
       font-size: 0.74rem;
     }
 
+    /* Mentor Diário section (mirrors Newsletter styles with mt- prefix) */
+    .dash-mentor {
+      background: var(--mt-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 22px 24px;
+      margin-bottom: 24px;
+    }
+
+    .mt-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .mt-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mt-icon {
+      width: 34px; height: 34px;
+      border-radius: 9px;
+      background: var(--mt-red-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+
+    .mt-title { font-weight: 700; font-size: 0.82rem; }
+    .mt-date-label { font-size: 0.64rem; color: var(--text-tertiary); }
+
+    .mt-link {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--mt-red);
+      text-decoration: none;
+      opacity: 0.5;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: opacity 0.2s;
+    }
+
+    .mt-link:hover { opacity: 1; }
+
+    .mt-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .mt-card {
+      padding: 14px 16px;
+      border-radius: var(--r-sm);
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.04);
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .mt-card:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: var(--border-hover);
+    }
+
+    .mt-card-n {
+      width: 22px; height: 22px;
+      border-radius: 6px;
+      background: var(--mt-red-soft);
+      color: var(--mt-red);
+      font-weight: 800;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mt-card-title {
+      font-size: 0.76rem;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+
+    .mt-card-desc {
+      font-size: 0.68rem;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .mt-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .mt-tag {
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 0.6rem;
+      font-weight: 600;
+      background: rgba(255,255,255,0.03);
+      color: var(--text-secondary);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .mt-load {
+      text-align: center;
+      padding: 28px;
+      color: var(--text-tertiary);
+      font-size: 0.74rem;
+    }
+
     /* ═══ COMPRAS INSUMOS FÁBRICA (colapsável, minimal) ═══ */
     .dash-compras-insumos {
       background: rgba(255,255,255,0.02);
@@ -1018,6 +1145,13 @@
 
       .dash-nl { padding: 16px; }
 
+      .mt-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .dash-mentor { padding: 16px; }
+
       .d-big { font-size: 1.8rem; }
 
       /* Sidebar items — touch targets ≥44px */
@@ -1126,6 +1260,10 @@
 
       <div class="dash-nl anim" id="newsletter" style="animation-delay:.15s">
         <div class="nl-load">Carregando newsletter...</div>
+      </div>
+
+      <div class="dash-mentor anim" id="mentorDiario" style="animation-delay:.17s">
+        <div class="mt-load">Carregando mentor diário...</div>
       </div>
 
       <div class="dash-verse anim" style="animation-delay:.2s">
@@ -1511,6 +1649,54 @@
       .catch(function(){ el.innerHTML='<div class="nl-load">Newsletter indisponivel</div>'; });
   }
 
+  /* ═══ MENTOR DIÁRIO ═══ */
+  function renderMentor(){
+    var el = document.getElementById('mentorDiario');
+    authFetch('/api/mentor')
+      .then(function(d){
+        if(d.error) throw new Error(d.error);
+        var items=[
+          {icon:'🛒',t:'Vendas & Atendimento',s:d.nomesVendas,desc:d.destaqueVendas},
+          {icon:'👨‍🍳',t:'Gestão de Cozinha Industrial',s:d.nomesCozinha,desc:d.destaqueCozinha}
+        ].filter(function(x){return x.s;});
+        if(!items.length) throw new Error('vazio');
+
+        var url = d.notionUrl||'#';
+        var df = '';
+        if(d.data){
+          var dt=new Date(d.data+'T12:00:00');
+          var ds=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+          var ms=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+          df=ds[dt.getDay()]+', '+dt.getDate()+' de '+ms[dt.getMonth()]+' de '+dt.getFullYear();
+        }
+
+        var cards='';
+        items.forEach(function(it){
+          var desc=it.desc?'<div class="mt-card-desc">'+it.desc+'</div>':'<div class="mt-card-desc">'+it.s+'</div>';
+          cards+='<a class="mt-card" href="'+url+'" target="_blank" rel="noopener">'+
+            '<div class="mt-card-n">'+it.icon+'</div>'+
+            '<div class="mt-card-title">'+it.t+'</div>'+desc+'</a>';
+        });
+
+        var tg='';
+        if(d.topicos&&d.topicos.length){
+          tg='<div class="mt-tags">';
+          d.topicos.forEach(function(t){ tg+='<span class="mt-tag">'+t+'</span>'; });
+          tg+='</div>';
+        }
+
+        var ft='';
+        if(d.notionUrl){
+          ft='<a class="mt-link" href="'+d.notionUrl+'" target="_blank" rel="noopener">Ler completa →</a>';
+        }
+
+        el.innerHTML=
+          '<div class="mt-header"><div class="mt-header-left"><div class="mt-icon">🎓</div><div><div class="mt-title">Mentor Diário</div><div class="mt-date-label">'+df+'</div></div></div>'+ft+'</div>'+
+          '<div class="mt-grid">'+cards+'</div>'+tg;
+      })
+      .catch(function(){ el.innerHTML='<div class="mt-load">Mentor diário indisponivel</div>'; });
+  }
+
   /* ═══ VERSICULO DO DIA ═══ */
   var VERSES = [
     { t: 'Porque eu bem sei os pensamentos que penso de vos, diz o Senhor; pensamentos de paz e nao de mal, para vos dar o fim que esperais.', r: 'Jeremias 29:11' },
@@ -1655,6 +1841,7 @@
   renderFabrica();
   renderComprasInsumos();
   renderNewsletter();
+  renderMentor();
   setInterval(function(){
     overviewPromise = null; // invalida cache do overview unificado
     renderContas();
@@ -1663,6 +1850,7 @@
     renderFabrica();
     renderComprasInsumos();
     renderNewsletter();
+    renderMentor();
   }, 2*60*1000);
 
   /* ═══ USER PROFILE ═══ */
