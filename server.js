@@ -470,8 +470,9 @@ async function fetchNewsletter() {
   return data;
 }
 
-async function fetchMentor() {
-  if (mentorCache.data && Date.now() - mentorCache.ts < CACHE_TTL) return mentorCache.data;
+const MENTOR_CACHE_TTL = 30 * 1000; // 30s (era 2min)
+async function fetchMentor(force = false) {
+  if (!force && mentorCache.data && Date.now() - mentorCache.ts < MENTOR_CACHE_TTL) return mentorCache.data;
   const result = await notionRequest(`/v1/databases/${MENTOR_DB_ID}/query`, {
     sorts: [{ property: 'Data', direction: 'descending' }], page_size: 1,
   });
@@ -493,10 +494,18 @@ async function fetchMentor() {
   };
   const getDate = (p) => (!p || p.type !== 'date' || !p.date) ? null : p.date.start;
   const getTopics = (p) => (!p || p.type !== 'multi_select') ? [] : (p.multi_select || []).map(t => t.name);
+  // Insights vem como texto com <br> entre itens — divide em lista.
+  const getInsights = (p) => {
+    const raw = getText(p);
+    if (!raw) return [];
+    return raw.split(/<br\s*\/?>|\n/).map(s => s.trim()).filter(Boolean);
+  };
   const data = {
     edicao: getText(props['Edição']), data: getDate(props['Data']),
     nomesVendas: getText(props['Nomes Vendas']), nomesCozinha: getText(props['Nomes Cozinha']),
     destaqueVendas: getText(props['Destaque Vendas']), destaqueCozinha: getText(props['Destaque Cozinha']),
+    insightsVendas: getInsights(props['Insights Vendas']),
+    insightsCozinha: getInsights(props['Insights Cozinha']),
     topicos: getTopics(props['Tópicos']), notionUrl: page.url || '',
   };
   mentorCache = { data, ts: Date.now() };
@@ -953,7 +962,8 @@ const server = http.createServer(async (req, res) => {
       const user = requireAuth(req, res); if (!user) return;
       if (!NOTION_API_KEY) return jsonRes(res, 503, { error: 'NOTION_API_KEY não configurada' });
       try {
-        const data = await fetchMentor();
+        const force = /(\?|&)fresh=1(&|$)/.test(req.url);
+        const data = await fetchMentor(force);
         if (!data) return jsonRes(res, 404, { error: 'Nenhuma edição' });
         return jsonRes(res, 200, data);
       } catch (err) { console.error('[Mentor]', err.message); return jsonRes(res, 500, { error: err.message || 'Erro mentor' }); }

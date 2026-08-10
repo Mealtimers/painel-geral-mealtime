@@ -719,6 +719,74 @@
       margin-bottom: 2px;
     }
 
+    .mt-insights {
+      margin-top: 8px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .mt-insights-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--mt-green, #6dcf6d);
+      opacity: 0.85;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .mt-insights ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .mt-insights li {
+      position: relative;
+      padding-left: 14px;
+      font-size: 0.7rem;
+      line-height: 1.5;
+      color: var(--text-secondary);
+    }
+
+    .mt-insights li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: var(--mt-red);
+      font-weight: 700;
+      opacity: 0.7;
+    }
+
+    .mt-refresh {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-tertiary);
+      font-size: 0.62rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-left: 8px;
+      transition: all 0.15s;
+    }
+
+    .mt-refresh:hover {
+      color: var(--mt-red);
+      border-color: var(--mt-red);
+    }
+
+    .mt-refresh:disabled {
+      opacity: 0.4;
+      cursor: wait;
+    }
+
     .mt-tags {
       display: flex;
       flex-wrap: wrap;
@@ -1620,15 +1688,16 @@
   }
 
   /* ═══ MENTOR DIÁRIO ═══ */
-  function renderMentor(){
+  function renderMentor(fresh){
     var el = document.getElementById('mentorDiario');
-    authFetch('/api/mentor')
+    var qs = fresh ? '?fresh=1' : '';
+    authFetch('/api/mentor'+qs)
       .then(function(d){
         if(d.error) throw new Error(d.error);
         var items=[
-          {icon:'🛒',t:'Vendas & Atendimento',s:d.nomesVendas,desc:d.destaqueVendas},
-          {icon:'👨‍🍳',t:'Gestão de Cozinha Industrial',s:d.nomesCozinha,desc:d.destaqueCozinha}
-        ].filter(function(x){return x.s;});
+          {icon:'🛒',t:'Vendas & Atendimento',s:d.nomesVendas,desc:d.destaqueVendas,ins:d.insightsVendas||[]},
+          {icon:'👨‍🍳',t:'Gestão de Cozinha Industrial',s:d.nomesCozinha,desc:d.destaqueCozinha,ins:d.insightsCozinha||[]}
+        ].filter(function(x){return x.s || x.desc || (x.ins&&x.ins.length);});
         if(!items.length) throw new Error('vazio');
 
         var url = d.notionUrl||'#';
@@ -1640,30 +1709,47 @@
           df=ds[dt.getDay()]+', '+dt.getDate()+' de '+ms[dt.getMonth()]+' de '+dt.getFullYear();
         }
 
+        var esc = function(s){ return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
+
         var cards='';
         items.forEach(function(it){
-          var desc = it.desc ? '<div class="mt-card-desc">'+it.desc+'</div>' : '';
-          var refs = it.s ? '<div class="mt-card-refs"><span class="mt-card-refs-label">Referências</span>'+it.s+'</div>' : '';
+          var desc = it.desc ? '<div class="mt-card-desc">'+esc(it.desc)+'</div>' : '';
+          var refs = it.s ? '<div class="mt-card-refs"><span class="mt-card-refs-label">Referências</span>'+esc(it.s)+'</div>' : '';
+          var ins='';
+          if(it.ins && it.ins.length){
+            ins='<div class="mt-insights"><div class="mt-insights-label">⚡ Aplicar hoje</div><ul>';
+            it.ins.forEach(function(x){ ins+='<li>'+esc(x)+'</li>'; });
+            ins+='</ul></div>';
+          }
           cards+='<a class="mt-card" href="'+url+'" target="_blank" rel="noopener">'+
             '<div class="mt-card-head"><div class="mt-card-n">'+it.icon+'</div><div class="mt-card-title">'+it.t+'</div></div>'+
-            desc+refs+'</a>';
+            desc+ins+refs+'</a>';
         });
 
         var tg='';
         if(d.topicos&&d.topicos.length){
           tg='<div class="mt-tags">';
-          d.topicos.forEach(function(t){ tg+='<span class="mt-tag">'+t+'</span>'; });
+          d.topicos.forEach(function(t){ tg+='<span class="mt-tag">'+esc(t)+'</span>'; });
           tg+='</div>';
         }
 
-        var ft='';
+        var ft='<button class="mt-refresh" id="mentorRefresh" title="Atualizar do Notion">↻ Atualizar</button>';
         if(d.notionUrl){
-          ft='<a class="mt-link" href="'+d.notionUrl+'" target="_blank" rel="noopener">Ler completa →</a>';
+          ft+='<a class="mt-link" href="'+d.notionUrl+'" target="_blank" rel="noopener">Ler completa →</a>';
         }
 
         el.innerHTML=
-          '<div class="mt-header"><div class="mt-header-left"><div class="mt-icon">🎓</div><div><div class="mt-title">Mentor Diário</div><div class="mt-date-label">'+df+'</div></div></div>'+ft+'</div>'+
+          '<div class="mt-header"><div class="mt-header-left"><div class="mt-icon">🎓</div><div><div class="mt-title">Mentor Diário</div><div class="mt-date-label">'+df+'</div></div></div><div>'+ft+'</div></div>'+
           '<div class="mt-grid">'+cards+'</div>'+tg;
+
+        var btn = document.getElementById('mentorRefresh');
+        if(btn){
+          btn.onclick = function(){
+            btn.disabled = true;
+            btn.textContent = 'Atualizando...';
+            renderMentor(true);
+          };
+        }
       })
       .catch(function(){ el.innerHTML='<div class="mt-load">Mentor diário indisponivel</div>'; });
   }
