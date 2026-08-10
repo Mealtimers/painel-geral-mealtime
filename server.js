@@ -475,7 +475,14 @@ async function fetchMentor() {
   const result = await notionRequest(`/v1/databases/${MENTOR_DB_ID}/query`, {
     sorts: [{ property: 'Data', direction: 'descending' }], page_size: 1,
   });
-  if (!result.results || !result.results.length) return null;
+  if (result.object === 'error') {
+    console.error('[Mentor] Notion error:', result.status, result.code, result.message);
+    throw new Error(`Notion ${result.code}: ${result.message}`);
+  }
+  if (!result.results || !result.results.length) {
+    console.warn('[Mentor] Database vazio ou sem resultados. MENTOR_DB_ID=', MENTOR_DB_ID);
+    return null;
+  }
   const page = result.results[0];
   const props = page.properties;
   const getText = (p) => {
@@ -949,7 +956,7 @@ const server = http.createServer(async (req, res) => {
         const data = await fetchMentor();
         if (!data) return jsonRes(res, 404, { error: 'Nenhuma edição' });
         return jsonRes(res, 200, data);
-      } catch (err) { console.error('[Mentor]', err.message); return jsonRes(res, 500, { error: 'Erro mentor' }); }
+      } catch (err) { console.error('[Mentor]', err.message); return jsonRes(res, 500, { error: err.message || 'Erro mentor' }); }
     }
 
     if (url === '/api/contas-resumo') {
