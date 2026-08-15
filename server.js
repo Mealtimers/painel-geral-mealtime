@@ -24,6 +24,11 @@ const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 
+// ── WhatsApp (Evolution API) — para envio de código 2FA por WPP ──
+const EVOLUTION_API_URL = (process.env.EVOLUTION_API_URL || '').replace(/\/$/, '');
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '';
+const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || '';
+
 // ── Brevo (HTTP) — Railway bloqueia SMTP; e-mail sai por HTTPS (api.brevo.com).
 // resolveBrevoKey tolera nome de variável com espaço acidental (" BREVO_API_KEY").
 function resolveBrevoKey() {
@@ -335,6 +340,23 @@ function maskEmailPB(email) {
   return (u.length <= 3 ? u[0] : u.slice(0, 3)) + '***@' + d;
 }
 
+function normalizePhoneBR(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (!digits) return '';
+  // Sem DDI: assume Brasil (+55). Com 10-11 dígitos → 55DDXXXXXXXX(X).
+  if (digits.length >= 12) return digits; // já tem DDI
+  if (digits.length === 10 || digits.length === 11) return '55' + digits;
+  return digits;
+}
+function maskPhonePB(phone) {
+  const p = String(phone || '').replace(/\D/g, '');
+  if (p.length < 4) return '***';
+  return '(' + p.slice(0, -6).slice(-2) + ') ****-' + p.slice(-4);
+}
+function hasWhatsappConfigured() { return !!(EVOLUTION_API_URL && EVOLUTION_API_KEY && EVOLUTION_INSTANCE); }
+function userHasWhatsapp(user) { return !!(user && user.telefone && normalizePhoneBR(user.telefone).length >= 12); }
+function canSendWhatsapp2fa(user) { return hasWhatsappConfigured() && userHasWhatsapp(user); }
+
 // Cookie de dispositivo confiável = JWT curto {uid, td} válido 30 dias
 function isTrustedDevice(req, userId) {
   const m = (req.headers['cookie'] || '').match(/painel_td=([^;]+)/);
@@ -347,6 +369,25 @@ function trustedDeviceCookie(userId) {
   const parts = [`painel_td=${token}`, 'HttpOnly', 'SameSite=Lax', 'Path=/', `Max-Age=${TD_MAX_AGE_SEC}`];
   if ((process.env.APP_BASE_URL || '').startsWith('https://')) parts.push('Secure');
   return parts.join('; ');
+}
+
+async function send2faWhatsapp(phoneRaw, code) {
+  if (!hasWhatsappConfigured()) throw new Error('Whatsapp gateway não configurado');
+  const number = normalizePhoneBR(phoneRaw);
+  if (number.length < 12) throw new Error('Telefone inválido');
+  const text = `*Meal Time — Painel Geral*\n\nSeu código de acesso: *${code}*\n\nExpira em 10 minutos. Se não foi você, avise o administrador.`;
+  const url = `${EVOLUTION_API_URL}/message/sendText/${encodeURIComponent(EVOLUTION_INSTANCE)}`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
+    body: JSON.stringify({ number, text }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    throw new Error(`Evolution ${resp.status}: ${body.slice(0, 200)}`);
+  }
+  return true;
 }
 
 async function send2faEmail(email, code) {
@@ -765,6 +806,7 @@ const server = http.createServer(async (req, res) => {
   if (url === '/api/auth/login' && req.method === 'POST') {
     const body = await readBody(req);
     const { usuario, senha } = body;
+    const channelRequested = (body.channel === 'whatsapp' || body.channel === 'email') ? body.channel : null;
     if (!usuario || !senha) return jsonRes(res, 400, { error: 'Usuário e senha obrigatórios' });
 
     const user = findUser(usuario);
@@ -773,26 +815,78 @@ const server = http.createServer(async (req, res) => {
       return jsonRes(res, 401, { ok: false, error: 'Usuário ou senha incorretos' });
     }
 
-    // 2FA por email — exceto em dispositivo já confiável (lembrado por 30 dias)
-    if (TWOFA_ENABLED && !isTrustedDevice(req, user.id)) {
-      const code = crypto.randomInt(100000, 1000000).toString();
-      const pending = crypto.randomBytes(24).toString('hex');
-      for (const [k, v] of twofaPending) { if (Date.now() > v.expiresAt) twofaPending.delete(k); }
-      twofaPending.set(pending, { userId: user.id, codeHash: sha256(code), expiresAt: Date.now() + TWOFA_TTL_MS, attempts: 0 });
-      const dest = user.email || RECOVER_EMAIL;
-      try { await send2faEmail(dest, code); console.log(`[2fa] código enviado para ${maskEmailPB(dest)}`); }
-      catch (e) { console.error('[2fa] erro email:', e.message); }
-      return jsonRes(res, 200, { ok: true, twofa: true, pending, email: maskEmailPB(dest) });
-    }
+    // 2FA obrigatório em TODO login (sem bypass por dispositivo confiável).
+    const code = crypto.randomInt(100000, 1000000).toString();
+    const pending = crypto.randomBytes(24).toString('hex');
+    for (const [k, v] of twofaPending) { if (Date.now() > v.expiresAt) twofaPending.delete(k); }
+    twofaPending.set(pending, { userId: user.id, codeHash: sha256(code), expiresAt: Date.now() + TWOFA_TTL_MS, attempts: 0 });
 
-    console.log(`[Auth] Login OK: ${usuario}`);
-    const token = generateToken(user);
-    return jsonRes(res, 200, { ok: true, token, user: sanitizeUser(user) });
+    const canWpp = canSendWhatsapp2fa(user);
+    const canEmail = !!(user.email || RECOVER_EMAIL);
+    // Canal padrão: o pedido do usuário (se possível), senão wpp se disponível, senão email.
+    let channel = channelRequested;
+    if (channel === 'whatsapp' && !canWpp) channel = null;
+    if (channel === 'email' && !canEmail) channel = null;
+    if (!channel) channel = canWpp ? 'whatsapp' : 'email';
+
+    let dest;
+    try {
+      if (channel === 'whatsapp') {
+        dest = maskPhonePB(user.telefone);
+        await send2faWhatsapp(user.telefone, code);
+        console.log(`[2fa] wpp enviado para ${dest} (user ${user.usuario})`);
+      } else {
+        const email = user.email || RECOVER_EMAIL;
+        dest = maskEmailPB(email);
+        await send2faEmail(email, code);
+        console.log(`[2fa] email enviado para ${dest} (user ${user.usuario})`);
+      }
+    } catch (e) {
+      console.error(`[2fa] erro envio ${channel}:`, e.message);
+      // Não vaza erro pro usuário — só sinaliza falha genérica.
+      return jsonRes(res, 500, { error: `Falha ao enviar código por ${channel === 'whatsapp' ? 'WhatsApp' : 'email'}.` });
+    }
+    return jsonRes(res, 200, {
+      ok: true, twofa: true, pending, channel, dest,
+      hasEmail: canEmail, hasWhatsapp: canWpp,
+    });
+  }
+
+  // Troca de canal (reenvia código pelo canal escolhido usando a MESMA pending session)
+  if (url === '/api/auth/2fa-resend' && req.method === 'POST') {
+    const body = await readBody(req);
+    const { pending, channel } = body;
+    const entry = pending ? twofaPending.get(pending) : null;
+    if (!entry || Date.now() > entry.expiresAt) return jsonRes(res, 400, { error: 'Sessão expirada. Faça login novamente.' });
+    if (channel !== 'email' && channel !== 'whatsapp') return jsonRes(res, 400, { error: 'Canal inválido' });
+    const user = findUserById(entry.userId);
+    if (!user) return jsonRes(res, 400, { error: 'Usuário não encontrado' });
+    // Gera código novo (invalida anterior) e reseta tentativas.
+    const code = crypto.randomInt(100000, 1000000).toString();
+    entry.codeHash = sha256(code); entry.attempts = 0; entry.expiresAt = Date.now() + TWOFA_TTL_MS;
+    let dest;
+    try {
+      if (channel === 'whatsapp') {
+        if (!canSendWhatsapp2fa(user)) return jsonRes(res, 400, { error: 'WhatsApp não disponível para este usuário.' });
+        dest = maskPhonePB(user.telefone);
+        await send2faWhatsapp(user.telefone, code);
+      } else {
+        const email = user.email || RECOVER_EMAIL;
+        if (!email) return jsonRes(res, 400, { error: 'Email não cadastrado.' });
+        dest = maskEmailPB(email);
+        await send2faEmail(email, code);
+      }
+      console.log(`[2fa] reenvio via ${channel} para ${dest} (user ${user.usuario})`);
+    } catch (e) {
+      console.error(`[2fa] erro reenvio ${channel}:`, e.message);
+      return jsonRes(res, 500, { error: `Falha ao enviar código por ${channel === 'whatsapp' ? 'WhatsApp' : 'email'}.` });
+    }
+    return jsonRes(res, 200, { ok: true, channel, dest });
   }
 
   if (url === '/api/auth/2fa-verify' && req.method === 'POST') {
     const body = await readBody(req);
-    const { pending, code, remember } = body;
+    const { pending, code } = body;
     const entry = pending ? twofaPending.get(pending) : null;
     if (!entry || Date.now() > entry.expiresAt) { if (entry) twofaPending.delete(pending); return jsonRes(res, 400, { error: 'Código expirado. Faça login novamente.' }); }
     if (entry.attempts >= 5) { twofaPending.delete(pending); return jsonRes(res, 429, { error: 'Muitas tentativas. Faça login novamente.' }); }
@@ -801,7 +895,6 @@ const server = http.createServer(async (req, res) => {
     const user = findUserById(entry.userId);
     twofaPending.delete(pending);
     if (!user) return jsonRes(res, 400, { error: 'Usuário não encontrado' });
-    if (remember) res.setHeader('Set-Cookie', trustedDeviceCookie(user.id));
     const token = generateToken(user);
     console.log(`[2fa] verificado — login OK: ${user.usuario}`);
     return jsonRes(res, 200, { ok: true, token, user: sanitizeUser(user) });
@@ -863,7 +956,7 @@ const server = http.createServer(async (req, res) => {
 
   if (url.startsWith('/api/')) {
     // Skip public auth endpoints
-    if (['/api/auth/login','/api/auth/2fa-verify','/api/auth/verify','/api/auth/recover','/api/auth/reset'].includes(url)) return;
+    if (['/api/auth/login','/api/auth/2fa-verify','/api/auth/2fa-resend','/api/auth/verify','/api/auth/recover','/api/auth/reset'].includes(url)) return;
 
     // ── User profile ──
 
