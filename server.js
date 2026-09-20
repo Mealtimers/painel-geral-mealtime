@@ -8,9 +8,6 @@ const nodemailer = require('nodemailer');
 const supabase = require('./lib/supabaseClient');
 
 const PORT = process.env.PORT || 3050;
-const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
-const NOTION_DB_ID = process.env.NOTION_DB_ID || '12bb62ac-a681-4f41-b6e5-87ecaa1151da';
-const MENTOR_DB_ID = process.env.MENTOR_DB_ID || '95bef7c6-b4fe-4ebe-825d-47d1d4d7290d';
 
 // ── Auth config ──
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
@@ -448,110 +445,14 @@ async function sendRecoveryEmail(email, resetCode) {
 }
 
 // ═══════════════════════════════════════
-//  NOTION — Newsletter
+//  CACHES + BI CLIENT
 // ═══════════════════════════════════════
 
 const CACHE_TTL = 2 * 60 * 1000;
-let newsletterCache = { data: null, ts: 0 };
-let mentorCache = { data: null, ts: 0 };
 let contasCache = { data: null, ts: 0 };
 let pedidosCache = { data: null, ts: 0 };
 let overviewCache = { data: null, ts: 0 };
 let biToken = { token: null, expiresAt: 0 };
-
-function notionRequest(endpoint, body) {
-  return new Promise((resolve, reject) => {
-    const payload = JSON.stringify(body);
-    const req = https.request({
-      hostname: 'api.notion.com', path: endpoint, method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${NOTION_API_KEY}`,
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload),
-      },
-    }, (res) => {
-      let data = '';
-      res.on('data', (chunk) => data += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch { reject(new Error('Notion parse error')); }
-      });
-    });
-    req.on('error', reject);
-    req.write(payload);
-    req.end();
-  });
-}
-
-async function fetchNewsletter() {
-  if (newsletterCache.data && Date.now() - newsletterCache.ts < CACHE_TTL) return newsletterCache.data;
-  const result = await notionRequest(`/v1/databases/${NOTION_DB_ID}/query`, {
-    sorts: [{ property: 'Data', direction: 'descending' }], page_size: 1,
-  });
-  if (!result.results || !result.results.length) return null;
-  const page = result.results[0];
-  const props = page.properties;
-  const getText = (p) => {
-    if (!p) return '';
-    if (p.type === 'title') return (p.title || []).map(t => t.plain_text).join('');
-    if (p.type === 'rich_text') return (p.rich_text || []).map(t => t.plain_text).join('');
-    return '';
-  };
-  const getDate = (p) => (!p || p.type !== 'date' || !p.date) ? null : p.date.start;
-  const getTopics = (p) => (!p || p.type !== 'multi_select') ? [] : (p.multi_select || []).map(t => t.name);
-  const data = {
-    edicao: getText(props['Edição']), data: getDate(props['Data']),
-    manchete1: getText(props['Manchete 1']), manchete2: getText(props['Manchete 2']),
-    manchete3: getText(props['Manchete 3']), resumo1: getText(props['Resumo 1']),
-    resumo2: getText(props['Resumo 2']), resumo3: getText(props['Resumo 3']),
-    topicos: getTopics(props['Tópicos']), notionUrl: page.url || '',
-  };
-  newsletterCache = { data, ts: Date.now() };
-  return data;
-}
-
-const MENTOR_CACHE_TTL = 30 * 1000; // 30s (era 2min)
-async function fetchMentor(force = false) {
-  if (!force && mentorCache.data && Date.now() - mentorCache.ts < MENTOR_CACHE_TTL) return mentorCache.data;
-  const result = await notionRequest(`/v1/databases/${MENTOR_DB_ID}/query`, {
-    sorts: [{ property: 'Data', direction: 'descending' }], page_size: 1,
-  });
-  if (result.object === 'error') {
-    console.error('[Mentor] Notion error:', result.status, result.code, result.message);
-    throw new Error(`Notion ${result.code}: ${result.message}`);
-  }
-  if (!result.results || !result.results.length) {
-    console.warn('[Mentor] Database vazio ou sem resultados. MENTOR_DB_ID=', MENTOR_DB_ID);
-    return null;
-  }
-  const page = result.results[0];
-  const props = page.properties;
-  const getText = (p) => {
-    if (!p) return '';
-    if (p.type === 'title') return (p.title || []).map(t => t.plain_text).join('');
-    if (p.type === 'rich_text') return (p.rich_text || []).map(t => t.plain_text).join('');
-    return '';
-  };
-  const getDate = (p) => (!p || p.type !== 'date' || !p.date) ? null : p.date.start;
-  const getTopics = (p) => (!p || p.type !== 'multi_select') ? [] : (p.multi_select || []).map(t => t.name);
-  // Insights vem como texto com <br> entre itens — divide em lista.
-  const getInsights = (p) => {
-    const raw = getText(p);
-    if (!raw) return [];
-    return raw.split(/<br\s*\/?>|\n/).map(s => s.trim()).filter(Boolean);
-  };
-  const data = {
-    edicao: getText(props['Edição']), data: getDate(props['Data']),
-    nomesVendas: getText(props['Nomes Vendas']), nomesCozinha: getText(props['Nomes Cozinha']),
-    destaqueVendas: getText(props['Destaque Vendas']), destaqueCozinha: getText(props['Destaque Cozinha']),
-    insightsVendas: getInsights(props['Insights Vendas']),
-    insightsCozinha: getInsights(props['Insights Cozinha']),
-    topicos: getTopics(props['Tópicos']), notionUrl: page.url || '',
-  };
-  mentorCache = { data, ts: Date.now() };
-  return data;
-}
 
 // ═══════════════════════════════════════
 //  BI BLING — Auth + Proxy
@@ -723,6 +624,175 @@ async function fetchOverviewUnificado() {
   };
   overviewCache = { data, ts: Date.now() };
   return data;
+}
+
+// ═══════════════════════════════════════
+//  DASHBOARD AGREGADO — 1 request, tudo em paralelo, cache 60s
+// ═══════════════════════════════════════
+let dashCache = { data: null, ts: 0 };
+const DASH_TTL = 60 * 1000;
+
+function addDaysISO(iso, n) {
+  const d = new Date(iso + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+const settled = (p) => (p && p.status === 'fulfilled') ? p.value : null;
+
+function appsToPing() {
+  return [
+    { id: 'bi',          nome: 'BI',            url: `${BI_API_URL.replace(/\/$/, '')}/api/health` },
+    { id: 'fabrica',     nome: 'Fábrica',       url: `${ESTOQUE_FABRICA_URL.replace(/\/$/, '')}/api/integration/status`, key: true },
+    { id: 'dietas',      nome: 'Pedidos',       url: 'https://dietas.mealtime.com.br/' },
+    { id: 'crm',         nome: 'CRM',           url: 'https://crm.mealtime.com.br/' },
+    { id: 'ads',         nome: 'Meta Ads',      url: 'https://ads.mealtime.com.br/' },
+    { id: 'mkt',         nome: 'Marketing',     url: 'https://marketing.mealtime.com.br/' },
+    { id: 'mealcontrol', nome: 'Ficha Técnica', url: 'https://mealcontrol.mealtime.com.br/' },
+  ];
+}
+
+async function pingApp(app) {
+  const t0 = Date.now();
+  try {
+    const headers = app.key && ESTOQUE_FABRICA_API_KEY ? { 'X-Internal-Api-Key': ESTOQUE_FABRICA_API_KEY } : {};
+    const r = await fetch(app.url, { method: 'GET', headers, redirect: 'manual', signal: AbortSignal.timeout(6000) });
+    // 2xx/3xx/4xx = processo vivo (login redireciona, 401/404 ainda é servidor de pé). 5xx = problema.
+    return { id: app.id, nome: app.nome, ok: r.status < 500, ms: Date.now() - t0, status: r.status };
+  } catch (e) {
+    return { id: app.id, nome: app.nome, ok: false, ms: Date.now() - t0, error: e.name === 'TimeoutError' ? 'timeout' : e.message };
+  }
+}
+async function pingApps() { return Promise.all(appsToPing().map(pingApp)); }
+
+async function fetchDashboard(force = false) {
+  if (!force && dashCache.data && Date.now() - dashCache.ts < DASH_TTL) return { ...dashCache.data, cached: true };
+
+  const today = todayBRT();
+  const from14 = addDaysISO(today, -13);
+  const monthStart = today.slice(0, 8) + '01';
+  const to7 = addDaysISO(today, 6);
+
+  const biConfigured = !!(BI_ADMIN_USER && BI_ADMIN_PASS);
+  let biErr = biConfigured ? null : 'BI não configurado';
+  if (biConfigured) { try { await ensureBiToken(); } catch (e) { biErr = e.message; } }
+  const bi = (p) => biErr ? Promise.reject(new Error(biErr)) : biRequest('GET', p);
+
+  const [rHoje, rSerie, rMes, rMetas, rAccounts, rContas7, rInsumos, rOverview, rApps] = await Promise.allSettled([
+    bi(`/api/bi/sales/analytics?dateFrom=${today}&dateTo=${today}`),
+    bi(`/api/bi/sales/analytics?dateFrom=${from14}&dateTo=${today}&groupBy=day`),
+    bi(`/api/bi/sales/analytics?dateFrom=${monthStart}&dateTo=${today}`),
+    bi('/api/bi/metas/results'),
+    bi('/api/bi/accounts'),
+    bi(`/api/bi/contas-pagar?dateFrom=${today}&dateTo=${to7}&dateField=vencimento`),
+    fetchComprasInsumosFabrica(),
+    fetchOverviewUnificado(),
+    pingApps(),
+  ]);
+
+  // Contas do BI (id → nome)
+  const accRaw = settled(rAccounts)?.data;
+  const accList = Array.isArray(accRaw) ? accRaw : (accRaw?.accounts || []);
+  const accName = {};
+  for (const a of accList) if (a && a.id) accName[a.id] = a.name || a.companyName || a.id;
+
+  // Hoje
+  const sHoje = settled(rHoje)?.data?.summary || {};
+  const hoje = {
+    valor: Number(sHoje.ordersValue || 0), pedidos: Number(sHoje.ordersCount || 0),
+    ticket: Number(sHoje.averageTicket || 0), itens: Number(sHoje.itemsSold || 0),
+  };
+
+  // Série 14 dias (sparkline + ontem + mesmo dia da semana passada)
+  const tl = settled(rSerie)?.data?.timeline || [];
+  const byDay = {};
+  for (const p of tl) byDay[p.label] = { valor: Number(p.revenue || 0), pedidos: Number(p.orders || 0) };
+  const serie = [];
+  for (let i = 13; i >= 0; i--) { const d = addDaysISO(today, -i); serie.push({ data: d, ...(byDay[d] || { valor: 0, pedidos: 0 }) }); }
+  const ontem = byDay[addDaysISO(today, -1)] || { valor: 0, pedidos: 0 };
+  const semanaPassada = byDay[addDaysISO(today, -7)] || { valor: 0, pedidos: 0 };
+  const pct = (a, b) => b > 0 ? Math.round(((a - b) / b) * 100) : (a > 0 ? 100 : 0);
+
+  // Mês + projeção linear
+  const sMes = settled(rMes)?.data?.summary || {};
+  const diaDoMes = Number(today.slice(8, 10));
+  const diasNoMes = new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0).getDate();
+  const mes = {
+    valor: Number(sMes.ordersValue || 0), pedidos: Number(sMes.ordersCount || 0), ticket: Number(sMes.averageTicket || 0),
+    diaDoMes, diasNoMes,
+    projecao: diaDoMes > 0 ? Math.round((Number(sMes.ordersValue || 0) / diaDoMes) * diasNoMes) : 0,
+  };
+
+  // Metas do período atual (do BI → Metas)
+  const goalsRaw = settled(rMetas)?.data?.goals || [];
+  const metas = goalsRaw.filter((g) => !g.isHistoric).map((g) => ({
+    id: g.id, nome: g.name || g.label || g.title || 'Meta',
+    target: Number(g.target || 0), atual: Number(g.current || 0), percent: Number(g.percent || 0),
+    accountId: g.accountId || null, accountIds: Array.isArray(g.accountIds) && g.accountIds.length ? g.accountIds : null,
+    type: g.type || 'monthly', atingiu: !!g.atingiu,
+  }));
+  const mensais = metas.filter((m) => m.type !== 'yearly');
+  const metaGeral = mensais.find((m) => m.accountId === 'all' && !m.accountIds)
+    || mensais.find((m) => !m.accountId && !m.accountIds)
+    || (mensais.length ? mensais.reduce((a, b) => (b.target > a.target ? b : a)) : null);
+
+  // Por loja (hoje, mês, meta)
+  const revHoje = sHoje.revenueByAccount || {};
+  const cntHoje = sHoje.ordersCountByAccount || {};
+  const revMes = sMes.revenueByAccount || {};
+  const ids = new Set([...Object.keys(revMes), ...Object.keys(revHoje), ...Object.keys(accName)]);
+  const lojas = [...ids].map((id) => {
+    const meta = mensais.find((m) => m.accountId === id && !m.accountIds);
+    return {
+      id, nome: accName[id] || id,
+      hoje: Number(revHoje[id] || 0), pedidosHoje: Number(cntHoje[id] || 0), mes: Number(revMes[id] || 0),
+      meta: meta ? meta.target : 0, metaPct: meta ? meta.percent : null,
+    };
+  }).filter((l) => l.mes > 0 || l.hoje > 0 || l.meta > 0).sort((a, b) => b.mes - a.mes);
+
+  // Contas a pagar em aberto: hoje + próximos 7 dias por vencimento
+  const rows = settled(rContas7)?.data?.rows || [];
+  const porDia = {}; const hojePorConta = {};
+  let hojeQtd = 0, hojeVal = 0, semQtd = 0, semVal = 0;
+  for (const r of rows) {
+    if (r.situacao === 'PAGO') continue;
+    const d = String(r.vencimento || '').slice(0, 10); if (!d) continue;
+    const v = Number(r.valor || 0);
+    if (!porDia[d]) porDia[d] = { data: d, qtd: 0, valor: 0 };
+    porDia[d].qtd++; porDia[d].valor += v; semQtd++; semVal += v;
+    if (d === today) {
+      hojeQtd++; hojeVal += v;
+      const n = r.accountName || 'Sem conta';
+      if (!hojePorConta[n]) hojePorConta[n] = { qtd: 0, valor: 0 };
+      hojePorConta[n].qtd++; hojePorConta[n].valor += v;
+    }
+  }
+  const dias = [];
+  for (let i = 0; i < 7; i++) { const d = addDaysISO(today, i); dias.push(porDia[d] || { data: d, qtd: 0, valor: 0 }); }
+
+  const insumos = settled(rInsumos) || { ok: false, total: 0, items: [] };
+  const ov = settled(rOverview) || {};
+  const apps = settled(rApps) || [];
+  const hojeOk = !biErr && settled(rHoje)?.status === 200;
+
+  const data = {
+    ok: true, data: today, geradoEm: new Date().toISOString(),
+    bi: { ok: hojeOk, erro: biErr || (rHoje.status === 'rejected' ? (rHoje.reason?.message || 'falha') : (hojeOk ? null : `HTTP ${settled(rHoje)?.status}`)) },
+    hoje: { ...hoje, vsOntem: pct(hoje.valor, ontem.valor), vsSemana: pct(hoje.valor, semanaPassada.valor), ontem, semanaPassada },
+    serie, mes, metaGeral, metas, lojas,
+    contas: {
+      hoje: { qtd: hojeQtd, valor: Math.round(hojeVal * 100) / 100, porConta: hojePorConta },
+      proximos7: { qtd: semQtd, valor: Math.round(semVal * 100) / 100, dias },
+    },
+    insumos: {
+      ok: insumos.ok !== false, total: Number(insumos.total || 0),
+      ultimaConferencia: insumos.ultimaConferenciaInsumos || null, erro: insumos.error || null,
+    },
+    dieta:   { ok: !!ov?.ok, pendentes: Number(ov?.dieta?.pendentes || 0), hoje: Number(ov?.dieta?.hoje || 0) },
+    fabrica: { ok: !!ov?.ok, movimentacoesHoje: Number(ov?.fabrica?.movimentacoesHoje || 0), estoqueCritico: Number(ov?.fabrica?.estoqueCritico || 0) },
+    apps,
+  };
+  dashCache = { data, ts: Date.now() };
+  return { ...data, cached: false };
 }
 
 // ═══════════════════════════════════════
@@ -1041,25 +1111,12 @@ const server = http.createServer(async (req, res) => {
 
     // ── Dashboard data ──
 
-    if (url === '/api/newsletter') {
+    if (url === '/api/dashboard') {
       const user = requireAuth(req, res); if (!user) return;
-      if (!NOTION_API_KEY) return jsonRes(res, 503, { error: 'NOTION_API_KEY não configurada' });
-      try {
-        const data = await fetchNewsletter();
-        if (!data) return jsonRes(res, 404, { error: 'Nenhuma edição' });
-        return jsonRes(res, 200, data);
-      } catch (err) { console.error('[Newsletter]', err.message); return jsonRes(res, 500, { error: 'Erro newsletter' }); }
-    }
-
-    if (url === '/api/mentor') {
-      const user = requireAuth(req, res); if (!user) return;
-      if (!NOTION_API_KEY) return jsonRes(res, 503, { error: 'NOTION_API_KEY não configurada' });
       try {
         const force = /(\?|&)fresh=1(&|$)/.test(req.url);
-        const data = await fetchMentor(force);
-        if (!data) return jsonRes(res, 404, { error: 'Nenhuma edição' });
-        return jsonRes(res, 200, data);
-      } catch (err) { console.error('[Mentor]', err.message); return jsonRes(res, 500, { error: err.message || 'Erro mentor' }); }
+        return jsonRes(res, 200, await fetchDashboard(force));
+      } catch (err) { console.error('[Dashboard]', err.message); return jsonRes(res, 500, { error: err.message || 'Erro dashboard' }); }
     }
 
     if (url === '/api/contas-resumo') {
