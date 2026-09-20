@@ -517,6 +517,22 @@
     }
     .meta-line b { overflow: hidden; text-overflow: ellipsis; }
 
+    /* ─── Carteira de clientes (CRM) — faixa fina, 3 estados ─── */
+    .cart { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; position: relative; z-index: 1; }
+    .cart-item { display: flex; align-items: baseline; gap: 7px; }
+    .cart-n { font-size: 1.3rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+    .cart-l { font-size: .64rem; color: var(--text-secondary); font-weight: 600; }
+    .cart-l small { display: block; font-size: .55rem; color: var(--text-tertiary); font-weight: 500; }
+    .cart-item.ativo .cart-n { color: #7ee08a; }
+    .cart-item.risco .cart-n { color: #f5b942; }
+    .cart-item.perdido .cart-n { color: var(--text-tertiary); }
+    .cart-bar { flex: 1 1 180px; min-width: 150px; height: 8px; border-radius: 5px; overflow: hidden; display: flex; background: rgba(255,255,255,.05); }
+    .cart-bar i { display: block; height: 100%; width: 0; transition: width 1.1s cubic-bezier(.4,0,.2,1) .2s; }
+    .cart-bar .s-ativo   { background: linear-gradient(90deg,#5CB85C,#7ee08a); }
+    .cart-bar .s-risco   { background: linear-gradient(90deg,#f5b942,#ffd27a); }
+    .cart-bar .s-perdido { background: rgba(255,255,255,.14); }
+    .cart-cta { font-size: .62rem; color: #f5b942; font-weight: 600; }
+
     .bi-err { font-size: .68rem; color: #ffb3b3; background: rgba(188,32,38,.12); border: 1px solid rgba(188,32,38,.3); padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; }
     .empty { font-size: .7rem; color: var(--text-tertiary); text-align: center; padding: 16px 8px; }
     .empty.good { color: #7ee08a; }
@@ -1056,6 +1072,8 @@
         <section class="card bx-3 half kpi anim" id="kpiInsumos" style="animation-delay:.2s"><div class="sk" style="width:40px;height:40px;border-radius:12px;flex-shrink:0"></div><div style="flex:1"><div class="sk-line sk" style="width:40%"></div><div class="sk-line sk" style="width:70%"></div></div></section>
         <section class="card bx-3 half kpi anim" id="kpiFabrica" style="animation-delay:.23s"><div class="sk" style="width:40px;height:40px;border-radius:12px;flex-shrink:0"></div><div style="flex:1"><div class="sk-line sk" style="width:40%"></div><div class="sk-line sk" style="width:70%"></div></div></section>
 
+        <section class="card bx anim" id="cardCarteira" style="animation-delay:.25s" hidden></section>
+
         <section class="card bx-6 anim" id="cardLojas" style="animation-delay:.26s">
           <div class="sk-line sk" style="width:35%"></div><div class="sk-line sk"></div><div class="sk-line sk"></div><div class="sk-line sk"></div>
         </section>
@@ -1357,7 +1375,7 @@
       .then(function(d){
         if (d.error) throw new Error(d.error);
         DASH.data = d;
-        renderHoje(d); renderMeta(d); renderKpis(d); renderLojas(d); renderContas7(d); renderApps(d);
+        renderHoje(d); renderMeta(d); renderKpis(d); renderCarteira(d); renderLojas(d); renderContas7(d); renderApps(d);
         document.getElementById('biErr').innerHTML = (d.bi && d.bi.ok === false)
           ? '<div class="bi-err">⚠️ BI indisponível ('+escHtml(d.bi.erro||'sem resposta')+'). Vendas, metas e contas podem aparecer zeradas.</div>' : '';
       })
@@ -1467,6 +1485,27 @@
       '<div class="bars7">'+bars+'</div>'+
       '<div class="contas-tot"><span>'+p.qtd+' conta(s) nos próximos 7 dias</span><b class="money">'+brl(p.valor)+'</b></div>'+lista;
     nextFrame(function(){ el.querySelectorAll('.bar7 i').forEach(function(b){ b.style.height = b.getAttribute('data-h')+'%'; }); });
+  }
+
+  function renderCarteira(d){
+    var el = document.getElementById('cardCarteira'), c = d.crm;
+    // Sem acesso ao CRM ou CRM fora do ar: o card some em vez de mostrar erro.
+    if (!c || c.ok === false){ el.hidden = true; return; }
+    var base = (c.ativos||0) + (c.emRisco||0) + (c.perdidos||0);
+    if (!base){ el.hidden = true; return; }
+    el.hidden = false;
+    var p = function(n){ return base>0 ? (n/base*100) : 0; };
+    var cta = c.emRisco>0 ? '<span class="cart-cta">' + c.emRisco + ' pra reativar antes de virar perda</span>' : '';
+    el.innerHTML =
+      '<div class="c-head"><div class="c-ico" style="background:rgba(196,166,255,.12)">👥</div><div><div class="c-title">Carteira de clientes</div><div class="c-sub">Por recência da última compra</div></div>'+
+      '<div class="c-right">'+cta+'<a class="c-link" href="'+ssoUrl('https://crm.mealtime.com.br/',true)+'" target="_blank" rel="noopener">CRM →</a></div></div>'+
+      '<div class="cart">'+
+        '<div class="cart-item ativo"><span class="cart-n">'+num(c.ativos)+'</span><span class="cart-l">ativos<small>até 60 dias</small></span></div>'+
+        '<div class="cart-item risco"><span class="cart-n">'+num(c.emRisco)+'</span><span class="cart-l">em risco<small>61 a 120 dias</small></span></div>'+
+        '<div class="cart-item perdido"><span class="cart-n">'+num(c.perdidos)+'</span><span class="cart-l">perdidos<small>+120 dias</small></span></div>'+
+        '<div class="cart-bar"><i class="s-ativo" data-w="'+p(c.ativos).toFixed(1)+'"></i><i class="s-risco" data-w="'+p(c.emRisco).toFixed(1)+'"></i><i class="s-perdido" data-w="'+p(c.perdidos).toFixed(1)+'"></i></div>'+
+      '</div>';
+    nextFrame(function(){ el.querySelectorAll('.cart-bar i').forEach(function(b){ b.style.width = b.getAttribute('data-w')+'%'; }); });
   }
 
   function renderApps(d){

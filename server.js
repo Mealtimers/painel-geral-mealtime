@@ -58,6 +58,7 @@ const BI_ADMIN_PASS = process.env.BI_ADMIN_PASS || '';
 // ── Estoque Fabrica config (integração cross-app) ──
 const ESTOQUE_FABRICA_URL = process.env.ESTOQUE_FABRICA_URL || 'https://estoque.mealtime.com.br';
 const ESTOQUE_FABRICA_API_KEY = process.env.ESTOQUE_FABRICA_API_KEY || '';
+const CRM_API_URL = process.env.CRM_API_URL || 'https://crm.mealtime.com.br';
 
 // ── Data dir ──
 const DATA_DIR = process.env.DATA_DIR || './data';
@@ -664,8 +665,41 @@ async function pingApp(app) {
 }
 async function pingApps() { return Promise.all(appsToPing().map(pingApp)); }
 
-async function fetchDashboard(force = false) {
-  if (!force && dashCache.data && Date.now() - dashCache.ts < DASH_TTL) return { ...dashCache.data, cached: true };
+/* ── CRM: carteira de clientes ──────────────────────────────────────────
+   Repassa o token do PRÓPRIO usuário logado (mesmo mecanismo do botão de SSO
+   que já abre o CRM). Não gera credencial nem eleva privilégio: quem não tem
+   acesso ao CRM recebe 403 e o card simplesmente não aparece.
+   Resposta agregada (contagens), sem dado pessoal de cliente. */
+async function fetchCrmCarteira(userToken) {
+  if (!userToken) throw new Error('sem token do usuário');
+  const url = `${CRM_API_URL.replace(/\/$/, '')}/api/clients/kpis`;
+  const r = await fetch(url, {
+    headers: { Authorization: `Bearer ${userToken}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (r.status === 401 || r.status === 403) throw new Error('sem acesso ao CRM');
+  if (!r.ok) throw new Error(`CRM HTTP ${r.status}`);
+  const d = await r.json();
+  if (d.ok === false) throw new Error(d.message || 'CRM recusou');
+  return {
+    ativos: Number(d.activeCustomers || 0),
+    emRisco: Number(d.atRisk || 0),
+    perdidos: Number(d.lost || 0),
+    compradores: Number(d.withPurchases || 0),
+    prospects: Number(d.prospects || 0),
+    interacoes30d: Number(d.recentInteractions || 0),
+  };
+}
+
+async function fetchDashboard(force = false, userToken = null) {
+  // CRM sai fora do cache compartilhado: a resposta depende do acesso de quem
+  // pediu, então cachear junto vazaria dados entre perfis diferentes.
+  const crmPromise = fetchCrmCarteira(userToken).catch((e) => ({ ok: false, erro: e.message }));
+  const withCrm = async (base) => {
+    const crm = await crmPromise;
+    return { ...base, crm: crm && crm.ok === false ? { ok: false, erro: crm.erro } : { ok: true, ...crm } };
+  };
+  if (!force && dashCache.data && Date.now() - dashCache.ts < DASH_TTL) return withCrm({ ...dashCache.data, cached: true });
 
   const today = todayBRT();
   const from14 = addDaysISO(today, -13);
@@ -802,7 +836,7 @@ async function fetchDashboard(force = false) {
     apps,
   };
   dashCache = { data, ts: Date.now() };
-  return { ...data, cached: false };
+  return withCrm({ ...data, cached: false });
 }
 
 // ═══════════════════════════════════════
@@ -1125,7 +1159,8 @@ const server = http.createServer(async (req, res) => {
       const user = requireAuth(req, res); if (!user) return;
       try {
         const force = /(\?|&)fresh=1(&|$)/.test(req.url);
-        return jsonRes(res, 200, await fetchDashboard(force));
+        const bearer = String(req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || null;
+        return jsonRes(res, 200, await fetchDashboard(force, bearer));
       } catch (err) { console.error('[Dashboard]', err.message); return jsonRes(res, 500, { error: err.message || 'Erro dashboard' }); }
     }
 
