@@ -1441,7 +1441,8 @@
   function openExt(url){ return function(){ window.open(url,'_blank'); }; }
   function renderKpis(d){
     var c = (d.contas && d.contas.hoje) || {qtd:0,valor:0};
-    kpi('kpiContas', c.qtd>0?'bad':'ok', '📋', c.qtd, 'Contas a pagar hoje', c.qtd>0 ? money(c.valor) : 'Nada vence hoje', openExt('https://www.bling.com.br/contas.pagar.php'));
+    // Vai pro BI (abre já filtrado em hoje / A VENCER / por vencimento), não pro Bling.
+    kpi('kpiContas', c.qtd>0?'bad':'ok', '📋', c.qtd, 'Contas a pagar hoje', c.qtd>0 ? money(c.valor) : 'Nada vence hoje', openExt(ssoUrl('https://bi.mealtime.com.br/bi.html#contas-pagar',true)));
     var di = d.dieta||{};
     kpi('kpiDieta', !di.ok?'muted':(di.pendentes>0?'warn':'ok'), '🥗', di.pendentes||0, 'Pedidos dieta pendentes', !di.ok?'Sem conexão':(di.hoje ? di.hoje+' criado(s) hoje' : 'Fila zerada'), openExt(ssoUrl('https://dietas.mealtime.com.br',true)));
     var ins = d.insumos||{};
@@ -1481,7 +1482,7 @@
     var pc = Object.keys(hj.porConta||{}).sort();
     var lista = pc.length ? '<div class="contas-hoje-list">'+pc.map(function(n){ var c=hj.porConta[n]; return '<div class="chl"><span>Hoje · '+escHtml(n)+' · '+c.qtd+'</span><b class="money">'+brl(c.valor)+'</b></div>'; }).join('')+'</div>' : '';
     el.innerHTML = '<div class="c-head"><div class="c-ico" style="background:var(--mt-red-soft)">📅</div><div><div class="c-title">Contas a pagar · 7 dias</div><div class="c-sub">Em aberto, por vencimento</div></div>'+
-      '<div class="c-right"><a class="c-link" href="https://www.bling.com.br/contas.pagar.php" target="_blank" rel="noopener">Bling →</a></div></div>'+
+      '<div class="c-right"><a class="c-link" href="'+ssoUrl('https://bi.mealtime.com.br/bi.html#contas-pagar',true)+'" target="_blank" rel="noopener">Ver no BI →</a></div></div>'+
       '<div class="bars7">'+bars+'</div>'+
       '<div class="contas-tot"><span>'+p.qtd+' conta(s) nos próximos 7 dias</span><b class="money">'+brl(p.valor)+'</b></div>'+lista;
     nextFrame(function(){ el.querySelectorAll('.bar7 i').forEach(function(b){ b.style.height = b.getAttribute('data-h')+'%'; }); });
