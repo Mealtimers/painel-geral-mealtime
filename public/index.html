@@ -396,6 +396,44 @@
     .c-title { font-weight: 700; font-size: .8rem; letter-spacing: .01em; }
     .c-sub { font-size: .62rem; color: var(--text-tertiary); font-weight: 500; margin-top: 1px; }
     .c-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+    /* ─── Recolher card ─── */
+    .c-head.clickable { cursor: pointer; user-select: none; -webkit-user-select: none; }
+    .c-collapse {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; flex-shrink: 0; padding: 0;
+      border-radius: 7px; cursor: pointer; font-family: inherit;
+      background: rgba(255,255,255,0.04); border: 1px solid transparent;
+      color: var(--text-tertiary); transition: color .2s, background .2s;
+    }
+    .c-collapse:hover { color: var(--text-primary); background: rgba(255,255,255,0.09); }
+    .c-collapse svg { transition: transform .3s cubic-bezier(.4,0,.2,1); }
+    .card.collapsed .c-collapse svg { transform: rotate(-90deg); }
+
+    .c-body {
+      overflow: hidden;
+      max-height: 1200px;
+      opacity: 1;
+      transition: max-height .4s cubic-bezier(.4,0,.2,1), opacity .25s ease, margin-top .4s;
+    }
+    .card.collapsed .c-body { max-height: 0; opacity: 0; }
+    .card.collapsed .c-head { margin-bottom: 0; }
+    /* Encolhe de verdade: sem isto o grid estica o card recolhido até a altura
+       do vizinho de linha e sobra um bloco vazio. */
+    .card.collapsed { padding-top: 14px; padding-bottom: 14px; align-self: start; }
+
+    /* Botão "recolher tudo" no topo */
+    .fold-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; flex-shrink: 0;
+      border-radius: 50%; cursor: pointer; font-family: inherit;
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      color: var(--text-tertiary); transition: color .2s, border-color .2s, background .2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .fold-btn:hover { color: var(--text-primary); border-color: var(--border-hover); background: rgba(255,255,255,0.06); }
+    .fold-btn svg { transition: transform .3s cubic-bezier(.4,0,.2,1); }
+    .fold-btn.folded svg { transform: rotate(180deg); }
     .c-link { font-size: .64rem; font-weight: 600; color: var(--text-tertiary); text-decoration: none; transition: color .2s; white-space: nowrap; }
     .c-link:hover { color: var(--mt-red); }
 
@@ -1052,6 +1090,7 @@
         </div>
         <div class="dash-actions">
           <button class="eye-btn" id="privacyBtn" type="button" aria-pressed="false" aria-label="Mostrar valores" title="Mostrar valores"></button>
+          <button class="fold-btn" id="foldAllBtn" type="button" aria-label="Recolher tudo" title="Recolher tudo"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/></svg></button>
           <button class="dash-refresh" id="dashRefresh" title="Atualizar agora"><span class="live"></span><span id="dashRefreshLbl">ao vivo</span></button>
         </div>
       </div>
@@ -1345,8 +1384,83 @@
     PRIVACY = !PRIVACY;
     applyPrivacy();
     // Re-render a partir do cache: regenera tooltips (que carregam valores).
-    if (DASH.data){ var d = DASH.data; renderHoje(d); renderMeta(d); renderKpis(d); renderLojas(d); renderContas7(d); }
+    if (DASH.data){ var d = DASH.data; renderHoje(d); renderMeta(d); renderKpis(d); renderLojas(d); renderContas7(d); applyFoldAll(); }
   }
+  /* ─── Recolher cards ───
+     Ao contrário do modo privacidade, isto É persistido: é preferência de
+     layout, não de segurança. Quem não usa um bloco deixa ele fechado. */
+  var FOLD_KEY = 'painel_collapsed';
+  var COLLAPSED = (function(){ try { return JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch(e){ return {}; } })();
+  var FOLDABLE = ['cardHoje','cardMeta','cardCarteira','cardLojas','cardContas7','cardApps'];
+
+  function saveCollapsed(){ try { localStorage.setItem(FOLD_KEY, JSON.stringify(COLLAPSED)); } catch(e){} }
+
+  function setCollapsed(id, on){
+    var el = document.getElementById(id); if(!el) return;
+    el.classList.toggle('collapsed', !!on);
+    if (on) COLLAPSED[id] = true; else delete COLLAPSED[id];
+    saveCollapsed();
+    syncFoldAllBtn();
+  }
+  function toggleCollapse(id){ setCollapsed(id, !document.getElementById(id).classList.contains('collapsed')); }
+
+  /* Torna um card recolhível depois que o render reescreveu o innerHTML:
+     move tudo que vem depois do cabeçalho pra dentro de .c-body e injeta o
+     botão. Idempotente — pode rodar a cada render. */
+  function makeFoldable(el){
+    if (!el || el.hidden) return;
+    var head = el.querySelector('.c-head'); if (!head) return;
+
+    if (!el.querySelector('.c-body')){
+      var body = document.createElement('div');
+      body.className = 'c-body';
+      var n = head.nextSibling;
+      while (n){ var next = n.nextSibling; body.appendChild(n); n = next; }
+      el.appendChild(body);
+    }
+
+    var right = head.querySelector('.c-right');
+    if (!right){ right = document.createElement('div'); right.className = 'c-right'; head.appendChild(right); }
+    if (!right.querySelector('.c-collapse')){
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'c-collapse';
+      btn.setAttribute('aria-label','Recolher');
+      btn.innerHTML = chevronSvg;
+      btn.addEventListener('click', function(e){ e.stopPropagation(); toggleCollapse(el.id); });
+      right.appendChild(btn);
+    }
+
+    // Cabeçalho inteiro clicável, menos links e botões.
+    if (!head.classList.contains('clickable')){
+      head.classList.add('clickable');
+      head.addEventListener('click', function(e){
+        if (e.target.closest('a') || e.target.closest('button')) return;
+        toggleCollapse(el.id);
+      });
+    }
+
+    el.classList.toggle('collapsed', !!COLLAPSED[el.id]);
+  }
+
+  function applyFoldAll(){ FOLDABLE.forEach(function(id){ makeFoldable(document.getElementById(id)); }); syncFoldAllBtn(); }
+
+  function visibleFoldable(){ return FOLDABLE.filter(function(id){ var e=document.getElementById(id); return e && !e.hidden && e.querySelector('.c-head'); }); }
+
+  function syncFoldAllBtn(){
+    var b = document.getElementById('foldAllBtn'); if(!b) return;
+    var vis = visibleFoldable();
+    var allFolded = vis.length > 0 && vis.every(function(id){ return COLLAPSED[id]; });
+    b.classList.toggle('folded', allFolded);
+    b.title = allFolded ? 'Expandir tudo' : 'Recolher tudo';
+    b.setAttribute('aria-label', b.title);
+  }
+
+  function toggleFoldAll(){
+    var vis = visibleFoldable();
+    var allFolded = vis.length > 0 && vis.every(function(id){ return COLLAPSED[id]; });
+    vis.forEach(function(id){ setCollapsed(id, !allFolded); });
+  }
+
   var EYE_ON  = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
   var EYE_OFF = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
   function nextFrame(fn){ requestAnimationFrame(function(){ requestAnimationFrame(fn); }); }
@@ -1376,6 +1490,7 @@
         if (d.error) throw new Error(d.error);
         DASH.data = d;
         renderHoje(d); renderMeta(d); renderKpis(d); renderCarteira(d); renderLojas(d); renderContas7(d); renderApps(d);
+        applyFoldAll();
         document.getElementById('biErr').innerHTML = (d.bi && d.bi.ok === false)
           ? '<div class="bi-err">⚠️ BI indisponível ('+escHtml(d.bi.erro||'sem resposta')+'). Vendas, metas e contas podem aparecer zeradas.</div>' : '';
       })
@@ -1659,6 +1774,7 @@
   /* ═══ INIT + AUTO-REFRESH ═══ */
   applyPrivacy(); // abre sempre com os valores ocultos
   document.getElementById('privacyBtn').addEventListener('click', togglePrivacy);
+  document.getElementById('foldAllBtn').addEventListener('click', toggleFoldAll);
   renderDashboard();
   renderComprasInsumos();
   document.getElementById('dashRefresh').addEventListener('click', function(){ renderDashboard(true); renderComprasInsumos(); });
