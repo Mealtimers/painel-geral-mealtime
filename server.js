@@ -731,9 +731,18 @@ async function fetchDashboard(force = false) {
     type: g.type || 'monthly', atingiu: !!g.atingiu,
   }));
   const mensais = metas.filter((m) => m.type !== 'yearly');
-  const metaGeral = mensais.find((m) => m.accountId === 'all' && !m.accountIds)
-    || mensais.find((m) => !m.accountId && !m.accountIds)
-    || (mensais.length ? mensais.reduce((a, b) => (b.target > a.target ? b : a)) : null);
+  // Meta geral do mês: a cadastrada como "todas as lojas"; senão, a soma das metas por loja.
+  let metaGeral = mensais.find((m) => m.accountId === 'all' && !m.accountIds)
+    || mensais.find((m) => !m.accountId && !m.accountIds) || null;
+  if (!metaGeral) {
+    const porLoja = mensais.filter((m) => m.accountId && m.accountId !== 'all' && !m.accountIds);
+    const somaTarget = porLoja.reduce((s, m) => s + m.target, 0);
+    if (somaTarget > 0) {
+      const somaAtual = porLoja.reduce((s, m) => s + m.atual, 0);
+      metaGeral = { id: 'soma', nome: `Soma das metas (${porLoja.length} lojas)`, target: somaTarget, atual: somaAtual,
+        percent: Math.round((somaAtual / somaTarget) * 100), accountId: 'all', accountIds: null, type: 'monthly', atingiu: somaAtual >= somaTarget, sintetica: true };
+    }
+  }
 
   // Por loja (hoje, mês, meta)
   const revHoje = sHoje.revenueByAccount || {};
@@ -756,7 +765,8 @@ async function fetchDashboard(force = false) {
   for (const r of rows) {
     if (r.situacao === 'PAGO') continue;
     const d = String(r.vencimento || '').slice(0, 10); if (!d) continue;
-    const v = Number(r.valor || 0);
+    // saldo = o que ainda falta pagar (conta parcialmente paga); cai pro valor cheio se ausente.
+    const v = Number(r.saldo != null && r.saldo !== '' ? r.saldo : (r.valor || 0));
     if (!porDia[d]) porDia[d] = { data: d, qtd: 0, valor: 0 };
     porDia[d].qtd++; porDia[d].valor += v; semQtd++; semVal += v;
     if (d === today) {
