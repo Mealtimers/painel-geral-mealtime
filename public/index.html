@@ -483,6 +483,13 @@
     @keyframes blinkRed { 0%,100%{opacity:1} 50%{opacity:.3} }
     .app small { color: var(--text-tertiary); font-weight: 500; }
 
+    /* Larguras médias (sidebar + miolo < 1180px): hero e meta em linha cheia pra não espremer os valores */
+    @media (max-width: 1180px) {
+      .bx-8, .bx-4 { grid-column: span 12; }
+      .ring-wrap { gap: 22px; }
+    }
+    .meta-line b { overflow: hidden; text-overflow: ellipsis; }
+
     .bi-err { font-size: .68rem; color: #ffb3b3; background: rgba(188,32,38,.12); border: 1px solid rgba(188,32,38,.3); padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; }
     .empty { font-size: .7rem; color: var(--text-tertiary); text-align: center; padding: 16px 8px; }
     .empty.good { color: #7ee08a; }
@@ -919,8 +926,17 @@
 
       .card { padding: 12px 14px; }
       .hero-big { font-size: 1.8rem; }
-      .bx-3.half { grid-column: span 12; }
+      /* KPIs seguem 2 por linha até no celular pequeno — 4 cards empilhados deixariam a home longa demais */
+      .bx-3.half { grid-column: span 6; }
+      .kpi { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; }
+      .kpi-ico { width: 32px; height: 32px; font-size: .95rem; }
       .kpi-n { font-size: 1.35rem; }
+      .kpi-l { font-size: .6rem; }
+      .kpi-s { font-size: .55rem; }
+      .ring { width: 78px; height: 78px; }
+      .ring-val { font-size: 1rem; }
+      .bars7 { height: 78px; gap: 4px; }
+      .bar7 i b { font-size: .48rem; }
 
       .verse-text { font-size: 0.74rem; }
 
