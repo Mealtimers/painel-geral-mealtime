@@ -1572,13 +1572,19 @@
     var tot = lojas.reduce(function(s,l){ return s+l.mes; },0);
     var rows = lojas.map(function(l,i){
       var cor = LOJA_CORES[i%LOJA_CORES.length];
-      var pct = l.meta>0 ? Math.min(100, Math.round(l.mes/l.meta*100)) : (tot>0 ? Math.round(l.mes/tot*100) : 0);
+      // Meta saiu daqui: ela ja e acompanhada na aba Metas do BI, com historico
+      // e comemoracao. Repetir no painel so criava um numero pra conferir duas
+      // vezes — e deixava o card incoerente, porque a Fabrica (sem meta) ja
+      // mostrava "% do total" enquanto as lojas mostravam "% da meta".
+      // A barra passa a ser sempre PARTICIPACAO no mes: o card vira uma leitura
+      // so, "quanto cada loja representa", que e o que o painel geral serve.
+      var pct = tot>0 ? Math.round(l.mes/tot*100) : 0;
       return '<div class="loja"><div class="loja-nome"><span class="loja-dot" style="background:'+cor+';color:'+cor+'"></span>'+escHtml(l.nome)+'</div>'+
         '<div class="loja-hoje">'+money(l.hoje)+'<small>'+l.pedidosHoje+' ped</small></div>'+
         '<div class="loja-bar"><i data-w="'+pct+'" style="background:'+cor+'"></i></div>'+
-        '<div class="loja-foot"><span>mês <b>'+money(l.mes,{short:true})+'</b></span><span>'+(l.meta>0 ? 'meta '+money(l.meta,{short:true})+' · <b>'+pct+'%</b>' : '<b>'+pct+'%</b> do total')+'</span></div></div>';
+        '<div class="loja-foot"><span>mês <b>'+money(l.mes,{short:true})+'</b></span><span><b>'+pct+'%</b> do total</span></div></div>';
     }).join('');
-    el.innerHTML = '<div class="c-head"><div class="c-ico" style="background:rgba(96,165,250,.12)">🏪</div><div><div class="c-title">Por loja</div><div class="c-sub">Hoje · acumulado do mês · meta</div></div></div>'+
+    el.innerHTML = '<div class="c-head"><div class="c-ico" style="background:rgba(96,165,250,.12)">🏪</div><div><div class="c-title">Por loja</div><div class="c-sub">Hoje · acumulado do mês · participação</div></div></div>'+
       (rows ? '<div class="lojas">'+rows+'</div>' : '<div class="empty">Sem vendas registradas no mês</div>');
     nextFrame(function(){ el.querySelectorAll('.loja-bar i').forEach(function(b){ b.style.width = b.getAttribute('data-w')+'%'; }); });
   }
