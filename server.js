@@ -649,7 +649,7 @@ function appsToPing() {
     { id: 'ads',         nome: 'Meta Ads',      url: 'https://ads.mealtime.com.br/' },
     { id: 'mkt',         nome: 'Marketing',     url: 'https://marketing.mealtime.com.br/' },
     { id: 'mealcontrol', nome: 'Ficha Técnica', url: 'https://mealcontrol.mealtime.com.br/' },
-    { id: 'tv',          nome: 'TV das Lojas', url: 'https://tv-lojas-production.up.railway.app/api/health' },
+    { id: 'tv',          nome: 'TV das Lojas', url: 'https://tv.mealtime.com.br/api/health' },
   ];
 }
 
