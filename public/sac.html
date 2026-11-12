@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Meal Time | SAC Geral</title>
+  <link rel="icon" href="https://www.mealtime.com.br/mealtime/logo-avatar-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#BC2026">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --mt-red: #BC2026;
+      --mt-red-soft: rgba(188,32,38,0.10);
+      --mt-green: #5CB85C;
+      --mt-green-soft: rgba(92,184,92,0.10);
+      --mt-dark: #0c0d0f;
+      --mt-panel: #141518;
+      --mt-card: #1a1b1f;
+      --border: rgba(255,255,255,0.06);
+      --border-hover: rgba(255,255,255,0.12);
+      --text-primary: #f0f0f0;
+      --text-secondary: rgba(255,255,255,0.50);
+      --text-tertiary: rgba(255,255,255,0.28);
+      --amber: #f5b942;
+      --r: 12px;
+      --r-sm: 8px;
+    }
+
+    html, body {
+      min-height: 100%;
+      font-family: "Inter", system-ui, sans-serif;
+      color: var(--text-primary);
+      background:
+        radial-gradient(ellipse 50% 35% at 50% -5%, rgba(188,32,38,0.06), transparent),
+        var(--mt-dark);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 28px 24px 60px; }
+
+    /* ─── Cabeçalho ─── */
+    .top { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+    .voltar {
+      display: inline-flex; align-items: center; gap: 7px; text-decoration: none;
+      font-size: .7rem; font-weight: 600; color: var(--text-tertiary);
+      border: 1px solid var(--border); background: rgba(255,255,255,0.03);
+      padding: 7px 12px; border-radius: 20px; transition: all .2s; white-space: nowrap;
+    }
+    .voltar:hover { color: var(--text-primary); border-color: var(--border-hover); }
+    .titulo { font-size: 1.5rem; font-weight: 800; letter-spacing: -.01em; }
+    .sub { font-size: .76rem; color: var(--text-secondary); margin-top: 3px; }
+    .acoes { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-family: inherit;
+      font-size: .68rem; font-weight: 600; color: var(--text-tertiary);
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      padding: 7px 12px; border-radius: 20px; transition: all .2s; white-space: nowrap;
+    }
+    .btn:hover { color: var(--text-primary); border-color: var(--border-hover); }
+    .btn .live { width: 6px; height: 6px; border-radius: 50%; background: var(--mt-green); }
+    .btn.busy .live { background: var(--amber); }
+
+    /* ─── Fontes (status por sistema) ─── */
+    .fontes { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 22px; }
+    .fonte {
+      display: inline-flex; align-items: center; gap: 7px; font-size: .66rem; font-weight: 600;
+      padding: 6px 11px; border-radius: 20px; background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border); color: var(--text-secondary);
+    }
+    .fonte i { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .fonte.bad { border-color: rgba(188,32,38,.3); color: #ffb3b3; }
+    .fonte.bad i { background: var(--mt-red); }
+    .fonte b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    .fonte small { color: var(--text-tertiary); font-weight: 500; }
+
+    /* ─── Seções ─── */
+    .secao { margin-bottom: 30px; }
+    .secao-cab { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+    .secao-nome { font-size: .92rem; font-weight: 800; }
+    .secao-n {
+      font-size: .64rem; font-weight: 800; padding: 2px 8px; border-radius: 20px;
+      background: rgba(255,255,255,.06); color: var(--text-secondary); font-variant-numeric: tabular-nums;
+    }
+    .secao.destaque .secao-n { background: var(--amber); color: #1a1205; }
+    .secao-ajuda { font-size: .7rem; color: var(--text-tertiary); margin-bottom: 14px; line-height: 1.5; }
+
+    /* ─── Item ─── */
+    .lista { display: flex; flex-direction: column; gap: 10px; }
+    .item {
+      display: block; text-decoration: none; color: inherit;
+      background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012));
+      border: 1px solid var(--border); border-left: 3px solid var(--borda-cor, var(--border));
+      border-radius: var(--r); padding: 15px 17px;
+      transition: transform .25s cubic-bezier(.2,.8,.2,1), border-color .25s, box-shadow .25s;
+    }
+    .item:hover { transform: translateY(-2px); border-color: var(--border-hover); box-shadow: 0 12px 28px -20px rgba(0,0,0,.9); }
+    .item.urgente { border-left-color: var(--amber); }
+
+    .item-topo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
+    .tag {
+      font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+      padding: 3px 8px; border-radius: 5px; white-space: nowrap;
+    }
+    .tag.sistema { background: rgba(255,255,255,.06); color: var(--text-secondary); }
+    .tag.problema { background: var(--mt-red-soft); color: #ff8585; }
+    .tag.melhoria { background: rgba(96,165,250,.14); color: #8cc0ff; }
+    .tag.alta { background: var(--mt-red-soft); color: #ff8585; }
+    .tag.media { background: rgba(245,185,66,.14); color: var(--amber); }
+    .tag.baixa { background: rgba(255,255,255,.05); color: var(--text-tertiary); }
+    .num { font-size: .64rem; font-weight: 800; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+    .quando { margin-left: auto; font-size: .62rem; color: var(--text-tertiary); white-space: nowrap; }
+
+    .item-titulo { font-size: .84rem; font-weight: 700; line-height: 1.45; margin-bottom: 6px; }
+    .item-quem { font-size: .64rem; color: var(--text-tertiary); margin-bottom: 9px; }
+
+    .bloco { padding: 10px 12px; border-radius: var(--r-sm); margin-top: 8px; }
+    .bloco-rot {
+      font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+      margin-bottom: 5px; display: block;
+    }
+    .bloco-txt { font-size: .74rem; line-height: 1.55; color: var(--text-secondary); }
+    .bloco.proposta { background: rgba(92,184,92,.07); border: 1px solid rgba(92,184,92,.18); }
+    .bloco.proposta .bloco-rot { color: #7ee08a; }
+    .bloco.proposta .bloco-txt { color: var(--text-primary); }
+    .bloco.explicacao { background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.05); }
+    .bloco.explicacao .bloco-rot { color: var(--text-tertiary); }
+
+    .item-pe {
+      margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .decidir { font-size: .66rem; font-weight: 700; color: var(--amber); }
+    .abrir { font-size: .66rem; font-weight: 600; color: var(--text-tertiary); white-space: nowrap; }
+    .item:hover .abrir { color: var(--mt-red); }
+
+    /* ─── Estados ─── */
+    .vazio {
+      text-align: center; padding: 34px 16px; border-radius: var(--r);
+      border: 1px dashed var(--border); color: var(--text-tertiary); font-size: .76rem;
+    }
+    .vazio.bom { color: #7ee08a; border-color: rgba(92,184,92,.22); background: rgba(92,184,92,.04); }
+    .erro {
+      font-size: .72rem; color: #ffb3b3; background: rgba(188,32,38,.12);
+      border: 1px solid rgba(188,32,38,.3); padding: 11px 13px; border-radius: 10px; margin-bottom: 18px;
+    }
+    .sk { position: relative; overflow: hidden; background: rgba(255,255,255,.05); border-radius: 6px; height: 74px; }
+    .sk::after {
+      content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent);
+      animation: shimmer 1.4s infinite;
+    }
+    @keyframes shimmer { to { transform: translateX(100%); } }
+
+    .anim { animation: sobe .45s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes sobe { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+    @media (max-width: 640px) {
+      .wrap { padding: 20px 14px 50px; }
+      .titulo { font-size: 1.22rem; }
+      .acoes { margin-left: 0; width: 100%; }
+      .quando { margin-left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="top">
+    <a class="voltar" href="/">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Painel
+    </a>
+    <div>
+      <div class="titulo">SAC Geral</div>
+      <div class="sub">Reclamações e melhorias de todos os sistemas, já triadas pela IA de cada um</div>
+    </div>
+    <div class="acoes">
+      <button class="btn" id="btnAtualizar" title="Buscar agora"><span class="live"></span><span id="btnLbl">ao vivo</span></button>
+    </div>
+  </div>
+
+  <div id="fontes" class="fontes"></div>
+  <div id="erro"></div>
+
+  <div class="secao destaque" id="secAguardando">
+    <div class="secao-cab"><span class="secao-nome">Esperando seu OK</span><span class="secao-n" id="nAguardando">0</span></div>
+    <div class="secao-ajuda">A IA já investigou e montou a correção. Abra no sistema para aprovar, acrescentar algo ou descartar.</div>
+    <div class="lista" id="listaAguardando"><div class="sk"></div><div class="sk"></div></div>
+  </div>
+
+  <div class="secao" id="secAprovado">
+    <div class="secao-cab"><span class="secao-nome">Aprovado, aguardando correção</span><span class="secao-n" id="nAprovado">0</span></div>
+    <div class="secao-ajuda">Você já deu o OK. A rotina corrige e avisa quem relatou.</div>
+    <div class="lista" id="listaAprovado"></div>
+  </div>
+
+  <div class="secao" id="secAberto">
+    <div class="secao-cab"><span class="secao-nome">Em acompanhamento</span><span class="secao-n" id="nAberto">0</span></div>
+    <div class="secao-ajuda">Relatos que a IA ainda está triando ou que já respondeu sem precisar de correção. Nada aqui depende de você.</div>
+    <div class="lista" id="listaAberto"></div>
+  </div>
+
+</div>
+
+<script>
+function getToken() { return localStorage.getItem('painel_token') || ''; }
+function authFetch(url) {
+  return fetch(url, { headers: { 'Authorization': 'Bearer ' + getToken() } }).then(function (r) {
+    if (r.status === 401) {
+      localStorage.removeItem('painel_token');
+      document.cookie = 'painel_token=; path=/; max-age=0';
+      window.location.href = '/login';
+      throw new Error('Sessão expirada');
+    }
+    return r.json();
+  });
+}
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+/* "há 2 dias" diz mais que uma data: o que importa é há quanto tempo está parado. */
+function quando(iso) {
+  if (!iso) return '';
+  var t = new Date(String(iso).replace(' ', 'T'));
+  if (isNaN(t)) return '';
+  var min = Math.floor((Date.now() - t.getTime()) / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return 'há ' + min + 'min';
+  var h = Math.floor(min / 60);
+  if (h < 24) return 'há ' + h + 'h';
+  var d = Math.floor(h / 24);
+  if (d === 1) return 'ontem';
+  if (d < 30) return 'há ' + d + ' dias';
+  return t.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function cardItem(i, urgente, atraso) {
+  var tags = '<span class="tag sistema">' + esc(i.sistemaNome || i.sistema) + '</span>' +
+    '<span class="tag ' + (i.tipo === 'melhoria' ? 'melhoria' : 'problema') + '">' + (i.tipo === 'melhoria' ? 'Melhoria' : 'Problema') + '</span>';
+  if (i.severidade) tags += '<span class="tag ' + esc(i.severidade) + '">' + esc(i.severidade) + '</span>';
+  if (i.num) tags += '<span class="num">#' + esc(i.num) + '</span>';
+  tags += '<span class="quando">' + quando(i.criadoEm) + '</span>';
+
+  var quem = [i.autor, i.origem].filter(Boolean).map(esc).join(' · ');
+
+  var blocos = '';
+  if (i.proposta) {
+    blocos += '<div class="bloco proposta"><span class="bloco-rot">O que a IA propõe</span>' +
+      '<div class="bloco-txt">' + esc(i.proposta) + '</div></div>';
+  }
+  if (i.explicacao) {
+    blocos += '<div class="bloco explicacao"><span class="bloco-rot">Por quê</span>' +
+      '<div class="bloco-txt">' + esc(i.explicacao) + '</div></div>';
+  }
+
+  var pe = '<div class="item-pe">' +
+    (urgente ? '<span class="decidir">Esperando sua decisão</span>' : '<span></span>') +
+    '<span class="abrir">Abrir no ' + esc(i.sistemaNome || i.sistema) + ' →</span></div>';
+
+  return '<a class="item anim' + (urgente ? ' urgente' : '') + '"' +
+    ' style="--borda-cor:' + esc(i.cor || 'transparent') + ';animation-delay:' + (Number(atraso) || 0) + 's"' +
+    ' href="' + esc(i.url || '#') + '" target="_blank" rel="noopener">' +
+    '<div class="item-topo">' + tags + '</div>' +
+    '<div class="item-titulo">' + esc(i.titulo || '(sem texto)') + '</div>' +
+    (quem ? '<div class="item-quem">' + quem + '</div>' : '') +
+    blocos + pe + '</a>';
+}
+
+function pinta(id, itens, urgente, vazioTxt, vazioBom) {
+  var el = document.getElementById(id);
+  if (!itens || !itens.length) {
+    el.innerHTML = '<div class="vazio' + (vazioBom ? ' bom' : '') + '">' + esc(vazioTxt) + '</div>';
+    return;
+  }
+  el.innerHTML = itens.map(function (i, n) { return cardItem(i, urgente, n * 0.04); }).join('');
+}
+
+var carregando = false;
+function carregar(fresh) {
+  if (carregando) return;
+  carregando = true;
+  var b = document.getElementById('btnAtualizar'), lbl = document.getElementById('btnLbl');
+  b.classList.add('busy'); lbl.textContent = 'buscando…';
+
+  authFetch('/api/sac-geral' + (fresh ? '?fresh=1' : ''))
+    .then(function (d) {
+      if (d.error) throw new Error(d.error);
+
+      document.getElementById('fontes').innerHTML = (d.sistemas || []).map(function (s) {
+        return '<span class="fonte' + (s.ok ? '' : ' bad') + '" title="' + esc(s.erro || '') + '">' +
+          '<i style="background:' + esc(s.cor) + '"></i>' + esc(s.nome) +
+          (s.ok ? (s.aguardandoOk ? ' <b>' + s.aguardandoOk + '</b> <small>pra decidir</small>' : ' <small>em dia</small>')
+                : ' <small>' + esc(s.erro || 'sem conexão') + '</small>') + '</span>';
+      }).join('');
+
+      var r = d.resumo || {};
+      document.getElementById('nAguardando').textContent = r.aguardandoOk || 0;
+      document.getElementById('nAprovado').textContent = r.aprovado || 0;
+      document.getElementById('nAberto').textContent = r.aberto || 0;
+
+      pinta('listaAguardando', d.aguardandoOk, true, 'Nada esperando por você. A IA não encontrou nada que precise da sua decisão.', true);
+      pinta('listaAprovado', d.aprovado, false, 'Nada aprovado na fila.');
+      pinta('listaAberto', d.aberto, false, 'Nenhum relato em aberto.');
+
+      document.getElementById('secAprovado').style.display = (d.aprovado || []).length ? '' : 'none';
+      document.getElementById('secAberto').style.display = (d.aberto || []).length ? '' : 'none';
+
+      document.getElementById('erro').innerHTML = r.foraDoAr
+        ? '<div class="erro">' + r.foraDoAr + (r.foraDoAr === 1 ? ' sistema não respondeu' : ' sistemas não responderam') +
+          '. O que aparece abaixo pode estar incompleto.</div>'
+        : '';
+    })
+    .catch(function (e) {
+      document.getElementById('erro').innerHTML = '<div class="erro">Falha ao carregar: ' + esc(e && e.message ? e.message : 'erro') + '</div>';
+      document.getElementById('listaAguardando').innerHTML = '';
+    })
+    .then(function () {
+      carregando = false;
+      b.classList.remove('busy');
+      lbl.textContent = 'ao vivo · ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    });
+}
+
+document.getElementById('btnAtualizar').addEventListener('click', function () { carregar(true); });
+carregar();
+setInterval(function () { carregar(); }, 2 * 60 * 1000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) carregar(); });
+</script>
+
+</body>
+</html>

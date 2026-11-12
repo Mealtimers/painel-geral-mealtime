@@ -59,6 +59,11 @@ const BI_ADMIN_PASS = process.env.BI_ADMIN_PASS || '';
 const ESTOQUE_FABRICA_URL = process.env.ESTOQUE_FABRICA_URL || 'https://estoque.mealtime.com.br';
 const ESTOQUE_FABRICA_API_KEY = process.env.ESTOQUE_FABRICA_API_KEY || '';
 const CRM_API_URL = process.env.CRM_API_URL || 'https://crm.mealtime.com.br';
+// SAC Geral: chaves de leitura dos SACs. Sem a chave, o sistema aparece na
+// pagina como "sem conexao" em vez de sumir calado.
+const CRM_ANALYSIS_API_KEY = process.env.CRM_ANALYSIS_API_KEY || process.env.ANALYSIS_API_KEY || '';
+const MEALCONTROL_URL = process.env.MEALCONTROL_URL || 'https://mealcontrol.mealtime.com.br';
+const MEALCONTROL_API_KEY = process.env.MEALCONTROL_API_KEY || '';
 
 // ── Data dir ──
 const DATA_DIR = process.env.DATA_DIR || './data';
@@ -630,6 +635,88 @@ async function fetchOverviewUnificado() {
 // ═══════════════════════════════════════
 //  DASHBOARD AGREGADO — 1 request, tudo em paralelo, cache 60s
 // ═══════════════════════════════════════
+// ═══════════════════════════════════════
+//  SAC GERAL — reúne os SACs dos três sistemas
+// ═══════════════════════════════════════
+// O painel só REÚNE e abre no sistema de origem: quem decide é o SAC de cada
+// app, que é onde a correção entra. Por isso aqui é leitura pura, sem ação.
+// Contrato do item (igual nos três): id, num, tipo, estado, titulo, relato,
+// proposta, explicacao, triagem, severidade, autor, origem, criadoEm, url.
+
+let sacCache = { data: null, ts: 0 };
+const SAC_TTL = 60 * 1000;
+
+function fontesSac() {
+  return [
+    {
+      id: 'crm', nome: 'CRM', cor: '#8cc0ff',
+      url: `${CRM_API_URL.replace(/\/$/, '')}/api/analysis/sac-feed?limite=80`,
+      headers: CRM_ANALYSIS_API_KEY ? { 'X-Api-Key': CRM_ANALYSIS_API_KEY } : null,
+      faltaChave: 'CRM_ANALYSIS_API_KEY',
+    },
+    {
+      id: 'fabrica', nome: 'Estoque Fábrica', cor: '#7ee08a',
+      url: `${ESTOQUE_FABRICA_URL.replace(/\/$/, '')}/api/integration/sac-feed?limite=80`,
+      headers: ESTOQUE_FABRICA_API_KEY ? { 'X-Internal-Api-Key': ESTOQUE_FABRICA_API_KEY } : null,
+      faltaChave: 'ESTOQUE_FABRICA_API_KEY',
+    },
+    {
+      id: 'mealcontrol', nome: 'Ficha Técnica', cor: '#c4a6ff',
+      url: `${MEALCONTROL_URL.replace(/\/$/, '')}/api/internal/sac-feed?limite=80`,
+      headers: MEALCONTROL_API_KEY ? { 'x-internal-api-key': MEALCONTROL_API_KEY } : null,
+      faltaChave: 'MEALCONTROL_API_KEY',
+    },
+  ];
+}
+
+async function lerFonteSac(f) {
+  if (!f.headers) return { id: f.id, nome: f.nome, cor: f.cor, ok: false, erro: `${f.faltaChave} não configurada no painel`, itens: [] };
+  try {
+    const r = await fetch(f.url, { headers: { ...f.headers, Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return { id: f.id, nome: f.nome, cor: f.cor, ok: false, erro: `HTTP ${r.status}`, itens: [] };
+    const d = await r.json();
+    if (d.ok === false) return { id: f.id, nome: f.nome, cor: f.cor, ok: false, erro: d.message || 'recusado', itens: [] };
+    const itens = (Array.isArray(d.itens) ? d.itens : []).map((i) => ({
+      ...i, sistema: f.id, sistemaNome: d.sistemaNome || f.nome, cor: f.cor,
+    }));
+    return { id: f.id, nome: d.sistemaNome || f.nome, cor: f.cor, ok: true, erro: null, itens };
+  } catch (e) {
+    return { id: f.id, nome: f.nome, cor: f.cor, ok: false, erro: e.name === 'TimeoutError' ? 'timeout' : e.message, itens: [] };
+  }
+}
+
+async function fetchSacGeral(force = false) {
+  if (!force && sacCache.data && Date.now() - sacCache.ts < SAC_TTL) return { ...sacCache.data, cached: true };
+
+  const fontes = await Promise.all(fontesSac().map(lerFonteSac));
+  const itens = fontes.flatMap((f) => f.itens)
+    .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
+
+  // A ordem da página: o que espera decisão primeiro, depois o aprovado que
+  // ainda não foi corrigido, por último o que é só acompanhamento.
+  const porEstado = (e) => itens.filter((i) => i.estado === e);
+  const data = {
+    ok: true,
+    geradoEm: new Date().toISOString(),
+    sistemas: fontes.map(({ id, nome, cor, ok, erro, itens: it }) => ({
+      id, nome, cor, ok, erro,
+      aguardandoOk: it.filter((i) => i.estado === 'aguardando_ok').length,
+      total: it.length,
+    })),
+    resumo: {
+      aguardandoOk: porEstado('aguardando_ok').length,
+      aprovado: porEstado('aprovado').length,
+      aberto: porEstado('aberto').length,
+      foraDoAr: fontes.filter((f) => !f.ok).length,
+    },
+    aguardandoOk: porEstado('aguardando_ok'),
+    aprovado: porEstado('aprovado'),
+    aberto: porEstado('aberto'),
+  };
+  sacCache = { data, ts: Date.now() };
+  return { ...data, cached: false };
+}
+
 let dashCache = { data: null, ts: 0 };
 const DASH_TTL = 60 * 1000;
 
@@ -1057,6 +1144,16 @@ const server = http.createServer(async (req, res) => {
 
   // ── Protected: index.html ──
 
+  if (url === '/sac' || url === '/sac.html') {
+    if (!isAuthenticated(req)) { res.writeHead(302, { 'Location': '/login' }); return res.end(); }
+    fs.readFile(path.join(PUBLIC, 'sac.html'), (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Not found'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+    return;
+  }
+
   if (url === '/' || url === '/index.html') {
     if (!isAuthenticated(req)) { res.writeHead(302, { 'Location': '/login' }); return res.end(); }
     fs.readFile(path.join(PUBLIC, 'index.html'), (err, data) => {
@@ -1155,6 +1252,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ── Dashboard data ──
+
+    if (url === '/api/sac-geral') {
+      const user = requireAuth(req, res); if (!user) return;
+      try {
+        const force = /(\?|&)fresh=1(&|$)/.test(req.url);
+        return jsonRes(res, 200, await fetchSacGeral(force));
+      } catch (err) { console.error('[SAC Geral]', err.message); return jsonRes(res, 500, { error: err.message || 'Erro SAC' }); }
+    }
 
     if (url === '/api/dashboard') {
       const user = requireAuth(req, res); if (!user) return;

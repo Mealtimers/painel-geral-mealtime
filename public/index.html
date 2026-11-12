@@ -1237,6 +1237,13 @@
   /* ═══ SIDEBAR MENU ═══ */
   var SECTIONS = [
     {
+      title: 'Suporte',
+      apps: [
+        { id:'sac', title:'SAC Geral', desc:'Reclamacoes e melhorias de todos', icon:'🎧', ic:'i-bi',
+          url:'/sac', sso:false, mesmaAba:true }
+      ]
+    },
+    {
       title: 'Dados & Inteligencia',
       apps: [
         { id:'bi', title:'BI Inteligencia', desc:'Fabrica, lojas e KPIs', icon:'📊', ic:'i-bi',
@@ -1324,10 +1331,13 @@
           item.href = '#';
           item.dataset.url = a.url || '';
           item.dataset.sso = a.sso ? '1' : '0';
+          item.dataset.mesmaAba = a.mesmaAba ? '1' : '0';
           item.addEventListener('click', function(e){
             e.preventDefault();
             var u = this.dataset.url;
             if(!u) return;
+            // Pagina do proprio painel abre aqui; app externo abre em outra aba.
+            if(this.dataset.mesmaAba === '1'){ window.location.href = u; return; }
             window.open(ssoUrl(u, this.dataset.sso==='1'), '_blank');
           });
           item.innerHTML =
