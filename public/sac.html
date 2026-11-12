@@ -78,6 +78,35 @@
     .fonte b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
     .fonte small { color: var(--text-tertiary); font-weight: 500; }
 
+    /* Clicar no app filtra a lista. Clicar de novo tira o filtro. */
+    .fonte { cursor: pointer; font-family: inherit; transition: all .18s; -webkit-tap-highlight-color: transparent; }
+    .fonte:hover { border-color: var(--border-hover); color: var(--text-primary); }
+    .fonte.on { border-color: currentColor; background: rgba(255,255,255,.07); color: var(--text-primary); }
+    .fonte.apagada { opacity: .4; }
+    .fonte-limpar {
+      border: 1px dashed var(--border); background: transparent; color: var(--text-tertiary);
+      font-family: inherit; font-size: .64rem; font-weight: 600; padding: 6px 11px;
+      border-radius: 20px; cursor: pointer; transition: all .18s;
+    }
+    .fonte-limpar:hover { color: var(--text-primary); border-color: var(--border-hover); }
+
+    /* ─── Abas ─── */
+    .abas { display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+    .aba {
+      font-family: inherit; font-size: .74rem; font-weight: 700; cursor: pointer;
+      background: transparent; border: none; border-bottom: 2px solid transparent;
+      color: var(--text-tertiary); padding: 9px 13px; transition: color .18s, border-color .18s;
+      display: inline-flex; align-items: center; gap: 7px; -webkit-tap-highlight-color: transparent;
+    }
+    .aba:hover { color: var(--text-secondary); }
+    .aba.on { color: var(--text-primary); border-bottom-color: var(--mt-red); }
+    .aba span {
+      font-size: .62rem; font-weight: 800; padding: 1px 7px; border-radius: 20px;
+      background: rgba(255,255,255,.07); color: var(--text-secondary); font-variant-numeric: tabular-nums;
+    }
+    .aba.on span { background: var(--mt-red-soft); color: #ff8585; }
+    .aba.destaque.on span { background: var(--amber); color: #1a1205; }
+
     /* ─── Seções ─── */
     .secao { margin-bottom: 30px; }
     .secao-cab { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
@@ -219,6 +248,11 @@
   <div id="fontes" class="fontes"></div>
   <div id="erro"></div>
 
+  <div class="abas">
+    <button type="button" class="aba destaque on" data-aba="ativos">Ativos <span id="nAbaAtivos">0</span></button>
+    <button type="button" class="aba" data-aba="resolvidos">Já resolvidos <span id="nAbaResolvidos">0</span></button>
+  </div>
+
   <div class="secao destaque" id="secAguardando">
     <div class="secao-cab"><span class="secao-nome">Esperando seu OK</span><span class="secao-n" id="nAguardando">0</span></div>
     <div class="secao-ajuda">A IA já investigou e montou a correção. Dê o OK aqui mesmo, acrescentando algo se quiser, ou descarte.</div>
@@ -229,6 +263,12 @@
     <div class="secao-cab"><span class="secao-nome">Aprovado, aguardando correção</span><span class="secao-n" id="nAprovado">0</span></div>
     <div class="secao-ajuda">Você já deu o OK. A rotina corrige e avisa quem relatou.</div>
     <div class="lista" id="listaAprovado"></div>
+  </div>
+
+  <div class="secao" id="secResolvido">
+    <div class="secao-cab"><span class="secao-nome">Já resolvido</span><span class="secao-n" id="nResolvido">0</span></div>
+    <div class="secao-ajuda">Corrigido, descartado ou respondido sem pendência. Fica aqui só pra consulta.</div>
+    <div class="lista" id="listaResolvido"></div>
   </div>
 
   <div class="secao" id="secAberto">
@@ -391,6 +431,84 @@ function pinta(id, itens, urgente, vazioTxt, vazioBom) {
 }
 
 var carregando = false;
+/* Filtro por app e aba ficam só na tela: o feed vem inteiro e a página escolhe
+   o que mostrar. Assim trocar de aba ou de app não custa uma volta no servidor. */
+var DADOS = null;
+var filtroApp = null;   // null = todos
+var abaAtual = 'ativos';
+
+function soDoApp(lista) {
+  var l = lista || [];
+  return filtroApp ? l.filter(function (i) { return i.sistema === filtroApp; }) : l;
+}
+
+function pintaFontes() {
+  if (!DADOS) return;
+  var sis = DADOS.sistemas || [];
+  var html = sis.map(function (s) {
+    var n = abaAtual === 'resolvidos' ? (s.resolvidos || 0) : (s.ativos || 0);
+    var marcado = filtroApp === s.id;
+    var apagado = filtroApp && !marcado;
+    return '<button type="button" class="fonte' + (s.ok ? '' : ' bad') + (marcado ? ' on' : '') +
+      (apagado ? ' apagada' : '') + '" data-app="' + esc(s.id) + '"' +
+      ' title="' + esc(s.erro || (marcado ? 'Mostrando só este. Clique pra ver todos.' : 'Ver só ' + s.nome)) + '">' +
+      '<i style="background:' + esc(s.cor) + '"></i>' + esc(s.nome) +
+      (s.ok ? ' <b>' + n + '</b>' : ' <small>' + esc(s.erro || 'sem conexão') + '</small>') + '</button>';
+  }).join('');
+  if (filtroApp) html += '<button type="button" class="fonte-limpar" id="limparFiltro">todos</button>';
+  document.getElementById('fontes').innerHTML = html;
+}
+
+function pintaListas() {
+  if (!DADOS) return;
+  var aguardando = soDoApp(DADOS.aguardandoOk);
+  var aprovado = soDoApp(DADOS.aprovado);
+  var aberto = soDoApp(DADOS.aberto);
+  var resolvido = soDoApp(DADOS.resolvido);
+  var naAba = abaAtual === 'ativos';
+
+  // Contadores da aba seguem o filtro: o número bate com o que está na tela.
+  document.getElementById('nAbaAtivos').textContent = aguardando.length + aprovado.length + aberto.length;
+  document.getElementById('nAbaResolvidos').textContent = resolvido.length;
+  document.getElementById('nAguardando').textContent = aguardando.length;
+  document.getElementById('nAprovado').textContent = aprovado.length;
+  document.getElementById('nAberto').textContent = aberto.length;
+  document.getElementById('nResolvido').textContent = resolvido.length;
+
+  var doApp = filtroApp ? ' em ' + nomeDoApp(filtroApp) : '';
+  if (naAba) {
+    pinta('listaAguardando', aguardando, true, 'Nada esperando por você' + doApp + '.', true);
+    pinta('listaAprovado', aprovado, false, 'Nada aprovado na fila.');
+    pinta('listaAberto', aberto, false, 'Nenhum relato em aberto.');
+  } else {
+    pinta('listaResolvido', resolvido, false, 'Nada resolvido ainda' + doApp + '.');
+  }
+
+  document.getElementById('secAguardando').style.display = naAba ? '' : 'none';
+  document.getElementById('secAprovado').style.display = (naAba && aprovado.length) ? '' : 'none';
+  document.getElementById('secAberto').style.display = (naAba && aberto.length) ? '' : 'none';
+  document.getElementById('secResolvido').style.display = naAba ? 'none' : '';
+
+  document.querySelectorAll('.aba').forEach(function (a) {
+    a.classList.toggle('on', a.getAttribute('data-aba') === abaAtual);
+  });
+}
+
+function nomeDoApp(id) {
+  var s = (DADOS && DADOS.sistemas || []).find(function (x) { return x.id === id; });
+  return s ? s.nome : id;
+}
+
+function repinta() { pintaFontes(); pintaListas(); }
+
+document.addEventListener('click', function (e) {
+  var app = e.target.closest ? e.target.closest('[data-app]') : null;
+  if (app) { var id = app.getAttribute('data-app'); filtroApp = (filtroApp === id) ? null : id; repinta(); return; }
+  if (e.target.closest('#limparFiltro')) { filtroApp = null; repinta(); return; }
+  var aba = e.target.closest ? e.target.closest('[data-aba]') : null;
+  if (aba) { abaAtual = aba.getAttribute('data-aba'); repinta(); }
+});
+
 function carregar(fresh) {
   if (carregando) return;
   carregando = true;
@@ -400,26 +518,12 @@ function carregar(fresh) {
   authFetch('/api/sac-geral' + (fresh ? '?fresh=1' : ''))
     .then(function (d) {
       if (d.error) throw new Error(d.error);
-
-      document.getElementById('fontes').innerHTML = (d.sistemas || []).map(function (s) {
-        return '<span class="fonte' + (s.ok ? '' : ' bad') + '" title="' + esc(s.erro || '') + '">' +
-          '<i style="background:' + esc(s.cor) + '"></i>' + esc(s.nome) +
-          (s.ok ? (s.aguardandoOk ? ' <b>' + s.aguardandoOk + '</b> <small>pra decidir</small>' : ' <small>em dia</small>')
-                : ' <small>' + esc(s.erro || 'sem conexão') + '</small>') + '</span>';
-      }).join('');
+      DADOS = d;
+      // App que sumiu do feed não pode deixar a tela filtrada em nada.
+      if (filtroApp && !(d.sistemas || []).some(function (s) { return s.id === filtroApp; })) filtroApp = null;
+      repinta();
 
       var r = d.resumo || {};
-      document.getElementById('nAguardando').textContent = r.aguardandoOk || 0;
-      document.getElementById('nAprovado').textContent = r.aprovado || 0;
-      document.getElementById('nAberto').textContent = r.aberto || 0;
-
-      pinta('listaAguardando', d.aguardandoOk, true, 'Nada esperando por você. A IA não encontrou nada que precise da sua decisão.', true);
-      pinta('listaAprovado', d.aprovado, false, 'Nada aprovado na fila.');
-      pinta('listaAberto', d.aberto, false, 'Nenhum relato em aberto.');
-
-      document.getElementById('secAprovado').style.display = (d.aprovado || []).length ? '' : 'none';
-      document.getElementById('secAberto').style.display = (d.aberto || []).length ? '' : 'none';
-
       document.getElementById('erro').innerHTML = r.foraDoAr
         ? '<div class="erro">' + r.foraDoAr + (r.foraDoAr === 1 ? ' sistema não respondeu' : ' sistemas não responderam') +
           '. O que aparece abaixo pode estar incompleto.</div>'

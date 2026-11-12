@@ -715,24 +715,32 @@ async function fetchSacGeral(force = false, userToken = null, chaveUsuario = 'an
 
   // A ordem da página: o que espera decisão primeiro, depois o aprovado que
   // ainda não foi corrigido, por último o que é só acompanhamento.
+  // `resolvido` sai da aba principal e vai pro histórico, pra lista do dia a
+  // dia só ter o que ainda anda.
   const porEstado = (e) => itens.filter((i) => i.estado === e);
+  const resolvido = porEstado('resolvido');
   const data = {
     ok: true,
     geradoEm: new Date().toISOString(),
     sistemas: fontes.map(({ id, nome, cor, ok, erro, itens: it }) => ({
       id, nome, cor, ok, erro,
       aguardandoOk: it.filter((i) => i.estado === 'aguardando_ok').length,
+      // Quanto cada app tem na aba Ativos: é o número que o filtro por app usa.
+      ativos: it.filter((i) => i.estado !== 'resolvido').length,
+      resolvidos: it.filter((i) => i.estado === 'resolvido').length,
       total: it.length,
     })),
     resumo: {
       aguardandoOk: porEstado('aguardando_ok').length,
       aprovado: porEstado('aprovado').length,
       aberto: porEstado('aberto').length,
+      resolvido: resolvido.length,
       foraDoAr: fontes.filter((f) => !f.ok).length,
     },
     aguardandoOk: porEstado('aguardando_ok'),
     aprovado: porEstado('aprovado'),
     aberto: porEstado('aberto'),
+    resolvido,
   };
   if (sacCache.size >= SAC_CACHE_MAX) sacCache.clear();
   sacCache.set(chaveUsuario, { data, ts: Date.now() });
