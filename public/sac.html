@@ -582,7 +582,9 @@ function pintaListas() {
   if (naAba) {
     pinta('listaAguardando', aguardando, true, 'Nada esperando por você' + doApp + '.', true);
     pinta('listaAprovado', aprovado, false, 'Nada aprovado na fila.');
-    pinta('listaAberto', aberto, false, 'Nenhum relato em aberto.');
+    // Em acompanhamento também vai em linha: nada aqui depende dele, então é
+    // leitura. Ele corre o olho e abre só o que quiser ler.
+    pinta('listaAberto', aberto, false, 'Nenhum relato em aberto.', false, true);
   } else {
     pinta('listaResolvido', resolvido, false, 'Nada decidido por você ainda' + doApp + '.', false, true);
   }
