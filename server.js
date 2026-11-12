@@ -650,15 +650,28 @@ async function fetchOverviewUnificado() {
 // Contrato do item (igual nos três): id, num, tipo, estado, titulo, relato,
 // proposta, explicacao, triagem, severidade, autor, origem, criadoEm, url.
 
-let sacCache = { data: null, ts: 0 };
+// Cache POR USUARIO: o feed do CRM responde conforme o perfil de quem pediu
+// (so admin ve), entao um cache compartilhado entregaria a um perfil o que foi
+// buscado por outro.
+const sacCache = new Map(); // chaveUsuario -> { data, ts }
 const SAC_TTL = 60 * 1000;
+const SAC_CACHE_MAX = 50;
 
-function fontesSac() {
+function fontesSac(userToken) {
   return [
     {
+      // O CRM compartilha o segredo de sessao com o painel, entao o caminho
+      // normal e repassar o token de quem pediu (igual a carteira de clientes):
+      // ninguem precisa copiar chave de um servico pro outro, e o CRM aplica a
+      // propria ACL (so admin ve). A rota com X-Api-Key fica como alternativa,
+      // pra quando a chave estiver configurada.
       id: 'crm', nome: 'CRM', cor: '#8cc0ff',
-      url: `${CRM_API_URL.replace(/\/$/, '')}/api/analysis/sac-feed?limite=80`,
-      headers: CRM_ANALYSIS_API_KEY ? { 'X-Api-Key': CRM_ANALYSIS_API_KEY } : null,
+      url: userToken
+        ? `${CRM_API_URL.replace(/\/$/, '')}/api/sac-feed?limite=80`
+        : `${CRM_API_URL.replace(/\/$/, '')}/api/analysis/sac-feed?limite=80`,
+      headers: userToken
+        ? { Authorization: `Bearer ${userToken}` }
+        : (CRM_ANALYSIS_API_KEY ? { 'X-Api-Key': CRM_ANALYSIS_API_KEY } : null),
       faltaChave: 'CRM_ANALYSIS_API_KEY',
     },
     {
@@ -692,10 +705,11 @@ async function lerFonteSac(f) {
   }
 }
 
-async function fetchSacGeral(force = false) {
-  if (!force && sacCache.data && Date.now() - sacCache.ts < SAC_TTL) return { ...sacCache.data, cached: true };
+async function fetchSacGeral(force = false, userToken = null, chaveUsuario = 'anon') {
+  const emCache = sacCache.get(chaveUsuario);
+  if (!force && emCache && Date.now() - emCache.ts < SAC_TTL) return { ...emCache.data, cached: true };
 
-  const fontes = await Promise.all(fontesSac().map(lerFonteSac));
+  const fontes = await Promise.all(fontesSac(userToken).map(lerFonteSac));
   const itens = fontes.flatMap((f) => f.itens)
     .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
 
@@ -720,7 +734,8 @@ async function fetchSacGeral(force = false) {
     aprovado: porEstado('aprovado'),
     aberto: porEstado('aberto'),
   };
-  sacCache = { data, ts: Date.now() };
+  if (sacCache.size >= SAC_CACHE_MAX) sacCache.clear();
+  sacCache.set(chaveUsuario, { data, ts: Date.now() });
   return { ...data, cached: false };
 }
 
@@ -793,7 +808,7 @@ async function decidirSac({ itens = [], aprovar = true, instrucao = '', por = 'd
     }
   }));
 
-  sacCache = { data: null, ts: 0 }; // a próxima leitura tem que vir fresca
+  sacCache.clear(); // a próxima leitura tem que vir fresca, pra todos os perfis
   const falhou = resultados.filter((r) => !r.ok);
   return {
     ok: falhou.length === 0,
@@ -1343,7 +1358,8 @@ const server = http.createServer(async (req, res) => {
       const user = requireAuth(req, res); if (!user) return;
       try {
         const force = /(\?|&)fresh=1(&|$)/.test(req.url);
-        return jsonRes(res, 200, await fetchSacGeral(force));
+        const bearer = String(req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || null;
+        return jsonRes(res, 200, await fetchSacGeral(force, bearer, user.id || 'anon'));
       } catch (err) { console.error('[SAC Geral]', err.message); return jsonRes(res, 500, { error: err.message || 'Erro SAC' }); }
     }
 
