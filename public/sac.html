@@ -90,6 +90,19 @@
     }
     .fonte-limpar:hover { color: var(--text-primary); border-color: var(--border-hover); }
 
+    /* Segunda faixa: filtra pela etiqueta do relato (dúvida, problema...) */
+    .categorias { margin-top: -14px; }
+    .cat {
+      font-family: inherit; font-size: .64rem; font-weight: 600; cursor: pointer;
+      padding: 5px 10px; border-radius: 20px; background: transparent;
+      border: 1px solid var(--border); color: var(--text-tertiary); transition: all .18s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cat:hover { color: var(--text-primary); border-color: var(--border-hover); }
+    .cat.on { color: var(--text-primary); border-color: var(--text-tertiary); background: rgba(255,255,255,.06); }
+    .cat.apagada { opacity: .4; }
+    .cat b { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
     /* ─── Abas ─── */
     .abas { display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
     .aba {
@@ -295,6 +308,7 @@
   </div>
 
   <div id="fontes" class="fontes"></div>
+  <div id="categorias" class="fontes categorias"></div>
   <div id="erro"></div>
 
   <div class="abas">
@@ -547,6 +561,7 @@ var carregando = false;
    o que mostrar. Assim trocar de aba ou de app não custa uma volta no servidor. */
 var DADOS = null;
 var filtroApp = null;   // null = todos
+var filtroCat = null;   // null = todas as categorias
 var abaAtual = 'ativos';
 /* A pagina repinta sozinha a cada 2 min e ao voltar pra aba. Sem isto, o item
    que ele abriu pra ler fecharia no meio da leitura. */
@@ -554,7 +569,39 @@ var abertos = {};
 
 function soDoApp(lista) {
   var l = lista || [];
-  return filtroApp ? l.filter(function (i) { return i.sistema === filtroApp; }) : l;
+  if (filtroApp) l = l.filter(function (i) { return i.sistema === filtroApp; });
+  if (filtroCat) l = l.filter(function (i) { return catDe(i) === filtroCat; });
+  return l;
+}
+
+/* Categoria e a etiqueta que a pessoa escolheu (duvida, problema, melhoria...).
+   Feed antigo so manda `tipo`; ai a categoria cai nele, pra nada sumir da tela
+   enquanto os tres sistemas nao mandam o campo novo. */
+function catDe(i) { return i.categoria || i.tipo || 'outros'; }
+function catNome(i) {
+  if (i.categoriaNome) return i.categoriaNome;
+  var c = catDe(i);
+  return c === 'melhoria' ? 'Melhoria' : c === 'duvida' ? 'Dúvida'
+    : c === 'erro_ficha' ? 'Erro em ficha' : c === 'dificuldade' ? 'Dificuldade'
+    : c === 'problema' ? 'Problema' : c;
+}
+
+/* Conta as categorias do que esta na aba, respeitando o filtro de app. Assim a
+   faixa so oferece categoria que existe ali, em vez de botao que da lista vazia. */
+function categoriasDaAba() {
+  var base = abaAtual === 'resolvidos'
+    ? [DADOS.resolvido]
+    : [DADOS.aguardandoOk, DADOS.aprovado, DADOS.aberto];
+  var itens = base.reduce(function (acc, l) { return acc.concat(l || []); }, []);
+  if (filtroApp) itens = itens.filter(function (i) { return i.sistema === filtroApp; });
+  var mapa = {};
+  itens.forEach(function (i) {
+    var c = catDe(i);
+    if (!mapa[c]) mapa[c] = { id: c, nome: catNome(i), n: 0 };
+    mapa[c].n++;
+  });
+  return Object.keys(mapa).map(function (k) { return mapa[k]; })
+    .sort(function (x, y) { return y.n - x.n; });
 }
 
 function pintaFontes() {
@@ -572,6 +619,19 @@ function pintaFontes() {
   }).join('');
   if (filtroApp) html += '<button type="button" class="fonte-limpar" id="limparFiltro">todos</button>';
   document.getElementById('fontes').innerHTML = html;
+
+  var cats = categoriasDaAba();
+  var el = document.getElementById('categorias');
+  // Uma categoria só não é filtro, é rótulo: não mostra a faixa.
+  if (cats.length < 2) { el.innerHTML = ''; return; }
+  var ch = cats.map(function (c) {
+    var marcado = filtroCat === c.id;
+    return '<button type="button" class="cat' + (marcado ? ' on' : '') +
+      (filtroCat && !marcado ? ' apagada' : '') + '" data-cat="' + esc(c.id) + '">' +
+      esc(c.nome) + ' <b>' + c.n + '</b></button>';
+  }).join('');
+  if (filtroCat) ch += '<button type="button" class="fonte-limpar" id="limparCat">todas</button>';
+  el.innerHTML = ch;
 }
 
 function pintaListas() {
@@ -590,15 +650,19 @@ function pintaListas() {
   document.getElementById('nAberto').textContent = aberto.length;
   document.getElementById('nResolvido').textContent = resolvido.length;
 
+  /* Com filtro ligado, "Nada esperando por você" mente: pode ter item esperando,
+     só não naquele recorte. O vazio diz o recorte pra ele não achar que zerou. */
   var doApp = filtroApp ? ' em ' + nomeDoApp(filtroApp) : '';
+  var daCat = filtroCat ? ' de ' + nomeDaCat(filtroCat) : '';
+  var recorte = daCat + doApp;
   if (naAba) {
-    pinta('listaAguardando', aguardando, true, 'Nada esperando por você' + doApp + '.', true);
-    pinta('listaAprovado', aprovado, false, 'Nada aprovado na fila.');
+    pinta('listaAguardando', aguardando, true, 'Nada' + recorte + ' esperando por você.', true);
+    pinta('listaAprovado', aprovado, false, 'Nada' + recorte + ' aprovado na fila.');
     // Em acompanhamento também vai em linha: nada aqui depende dele, então é
     // leitura. Ele corre o olho e abre só o que quiser ler.
-    pinta('listaAberto', aberto, false, 'Nenhum relato em aberto.', false, true);
+    pinta('listaAberto', aberto, false, 'Nenhum relato' + recorte + ' em acompanhamento.', false, true);
   } else {
-    pinta('listaResolvido', resolvido, false, 'Nada decidido por você ainda' + doApp + '.', false, true);
+    pinta('listaResolvido', resolvido, false, 'Nada' + recorte + ' decidido por você ainda.', false, true);
   }
 
   document.getElementById('secAguardando').style.display = naAba ? '' : 'none';
@@ -613,6 +677,11 @@ function pintaListas() {
   document.querySelectorAll('[data-linha]').forEach(function (l) {
     if (abertos[l.getAttribute('data-id')]) l.classList.add('aberto');
   });
+}
+
+function nomeDaCat(id) {
+  var c = categoriasDaAba().find(function (x) { return x.id === id; });
+  return c ? c.nome.toLowerCase() : id;
 }
 
 function nomeDoApp(id) {
@@ -633,6 +702,9 @@ document.addEventListener('click', function (e) {
   var app = e.target.closest ? e.target.closest('[data-app]') : null;
   if (app) { var id = app.getAttribute('data-app'); filtroApp = (filtroApp === id) ? null : id; repinta(); return; }
   if (e.target.closest('#limparFiltro')) { filtroApp = null; repinta(); return; }
+  var cat = e.target.closest ? e.target.closest('[data-cat]') : null;
+  if (cat) { var cid = cat.getAttribute('data-cat'); filtroCat = (filtroCat === cid) ? null : cid; repinta(); return; }
+  if (e.target.closest('#limparCat')) { filtroCat = null; repinta(); return; }
   var aba = e.target.closest ? e.target.closest('[data-aba]') : null;
   if (aba) { abaAtual = aba.getAttribute('data-aba'); repinta(); }
 });
@@ -649,6 +721,7 @@ function carregar(fresh) {
       DADOS = d;
       // App que sumiu do feed não pode deixar a tela filtrada em nada.
       if (filtroApp && !(d.sistemas || []).some(function (s) { return s.id === filtroApp; })) filtroApp = null;
+      if (filtroCat && !categoriasDaAba().some(function (c) { return c.id === filtroCat; })) filtroCat = null;
       repinta();
 
       var r = d.resumo || {};
