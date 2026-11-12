@@ -749,8 +749,13 @@ async function fetchSacGeral(force = false, userToken = null, chaveUsuario = 'an
    - MealControl→ aplica a correção na ficha na hora, com as travas de lá. */
 const DESTINOS_SAC = {
   crm: {
-    url: () => `${CRM_API_URL.replace(/\/$/, '')}/api/analysis/relatos/decidir`,
-    headers: () => (CRM_ANALYSIS_API_KEY ? { 'X-Api-Key': CRM_ANALYSIS_API_KEY } : null),
+    // Mesma logica do feed: pela sessao do dono quando ela existe, pela chave
+    // de servico so como alternativa. Assim decidir nao depende de configurar
+    // chave nenhuma.
+    url: (userToken) => `${CRM_API_URL.replace(/\/$/, '')}${userToken ? '/api/sac-decidir' : '/api/analysis/relatos/decidir'}`,
+    headers: (userToken) => (userToken
+      ? { Authorization: `Bearer ${userToken}` }
+      : (CRM_ANALYSIS_API_KEY ? { 'X-Api-Key': CRM_ANALYSIS_API_KEY } : null)),
     faltaChave: 'CRM_ANALYSIS_API_KEY',
     // O CRM decide pela proposta numerada; item sem número não dá pra decidir.
     corpo: (itens, aprovar, instrucao, por) => {
@@ -773,7 +778,7 @@ const DESTINOS_SAC = {
   },
 };
 
-async function decidirSac({ itens = [], aprovar = true, instrucao = '', por = 'dono' } = {}) {
+async function decidirSac({ itens = [], aprovar = true, instrucao = '', por = 'dono', userToken = null } = {}) {
   // Agrupa por sistema: cada um recebe uma chamada só.
   const porSistema = {};
   const recusados = [];
@@ -785,12 +790,12 @@ async function decidirSac({ itens = [], aprovar = true, instrucao = '', por = 'd
 
   const resultados = await Promise.all(Object.entries(porSistema).map(async ([sis, lista]) => {
     const d = DESTINOS_SAC[sis];
-    const headers = d.headers();
+    const headers = d.headers(userToken);
     if (!headers) return { sistema: sis, ok: false, erro: `${d.faltaChave} não configurada no painel` };
     const body = d.corpo(lista, aprovar, instrucao, por);
     if (!body) return { sistema: sis, ok: false, erro: d.semNumero || 'nada pra decidir' };
     try {
-      const r = await fetch(d.url(), {
+      const r = await fetch(d.url(userToken), {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(body),
@@ -1376,6 +1381,7 @@ const server = http.createServer(async (req, res) => {
           aprovar: body.aprovar !== false,
           instrucao: String(body.instrucao || '').slice(0, 2000),
           por: user.nome || user.usuario || 'dono',
+          userToken: String(req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || null,
         });
         console.log(`[SAC Geral] ${r.aprovar ? 'aprovou' : 'descartou'} ${r.decididos} item(ns) — por ${user.usuario}`);
         return jsonRes(res, 200, r);
