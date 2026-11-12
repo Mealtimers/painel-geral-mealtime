@@ -480,7 +480,19 @@ function cardLinha(i, atraso) {
       '<div class="fala-txt">' + esc(i.relato) + '</div></div>';
   }
 
+  /* Nos SACs a PRIMEIRA resposta fica num campo só dela (`resposta`) e o
+     `conversa` traz o que veio depois. Mostrar um ou outro engolia justamente a
+     resposta inicial, e a leitura ficava "ela perguntou, ela perguntou de novo".
+     Aqui o fio é remontado inteiro. O MealControl já manda a resposta dentro da
+     conversa, então só junta quando o texto ainda não está lá. */
   var conversa = (i.conversa || []).filter(function (m) { return m && m.texto; });
+  var jaNoFio = i.resposta && conversa.some(function (m) {
+    return String(m.texto).trim() === String(i.resposta).trim();
+  });
+  if (i.resposta && !jaNoFio && conversa.length) {
+    conversa = [{ de: 'Suporte', daPessoa: false, texto: i.resposta }].concat(conversa);
+  }
+
   if (conversa.length > 1) {
     blocos += '<div class="fala resposta"><span class="fala-rot">Conversa</span><div>' +
       conversa.map(function (m) {
