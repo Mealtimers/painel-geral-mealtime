@@ -718,7 +718,15 @@ async function fetchSacGeral(force = false, userToken = null, chaveUsuario = 'an
   // `resolvido` sai da aba principal e vai pro histórico, pra lista do dia a
   // dia só ter o que ainda anda.
   const porEstado = (e) => itens.filter((i) => i.estado === e);
-  const resolvido = porEstado('resolvido');
+
+  // O histórico é do que PASSOU PELA DECISÃO dele (OK ou descarte). Relato que
+  // o atendente ou a IA respondeu e fechou não entra: ele não decidiu nada ali
+  // e a aba viraria caixa de entrada velha.
+  // Sinal: proposta numerada (`num`). Nos três feeds o número só nasce quando o
+  // item vira proposta, que é o que exige decisão. Sem número = fechado no
+  // atendimento.
+  const passouPorDecisao = (i) => i.num !== null && i.num !== undefined && i.num !== '';
+  const resolvido = porEstado('resolvido').filter(passouPorDecisao);
   const data = {
     ok: true,
     geradoEm: new Date().toISOString(),

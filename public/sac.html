@@ -198,6 +198,55 @@
     .dec-res.ruim { color: #ffb3b3; background: rgba(188,32,38,.12); border: 1px solid rgba(188,32,38,.3); }
     .item.decidido { opacity: .5; }
 
+    /* ─── Resolvido: uma linha que abre ─── */
+    .item.linha { padding: 0; cursor: pointer; }
+    .item.linha .linha-cab {
+      display: flex; align-items: center; gap: 10px; padding: 12px 15px;
+    }
+    .item.linha:hover .linha-cab { background: rgba(255,255,255,.025); }
+    .linha-tag {
+      font-size: .56rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+      padding: 2px 7px; border-radius: 5px; background: rgba(255,255,255,.06);
+      color: var(--text-tertiary); flex-shrink: 0;
+    }
+    .linha-titulo {
+      flex: 1; min-width: 0; font-size: .76rem; font-weight: 600; color: var(--text-secondary);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .item.linha.aberto .linha-titulo { white-space: normal; color: var(--text-primary); }
+    .linha-quando { font-size: .62rem; color: var(--text-tertiary); flex-shrink: 0; }
+    .linha-seta { color: var(--text-tertiary); flex-shrink: 0; transition: transform .25s; display: flex; }
+    .item.linha.aberto .linha-seta { transform: rotate(180deg); }
+
+    .linha-corpo { display: none; padding: 0 15px 15px; }
+    .item.linha.aberto .linha-corpo { display: block; }
+
+    /* Pergunta, resposta e análise: os três blocos que ele pediu */
+    .fala { margin-top: 12px; }
+    .fala-rot {
+      font-size: .58rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); display: block; margin-bottom: 5px;
+    }
+    .fala-txt {
+      font-size: .74rem; line-height: 1.6; color: var(--text-secondary);
+      background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.05);
+      border-radius: 9px; padding: 10px 12px; white-space: pre-wrap;
+    }
+    .fala.pergunta .fala-rot { color: #8cc0ff; }
+    .fala.pergunta .fala-txt { background: rgba(96,165,250,.06); border-color: rgba(96,165,250,.16); color: var(--text-primary); }
+    .fala.resposta .fala-rot { color: #7ee08a; }
+    .fala.resposta .fala-txt { background: rgba(92,184,92,.06); border-color: rgba(92,184,92,.16); color: var(--text-primary); }
+    .fala.analise .fala-rot { color: var(--amber); }
+
+    .msg { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+    .msg-de { font-size: .6rem; font-weight: 700; color: var(--text-tertiary); }
+    .msg.dela .msg-de { color: #8cc0ff; }
+    .msg-txt {
+      font-size: .72rem; line-height: 1.55; color: var(--text-secondary);
+      background: rgba(255,255,255,.025); border-radius: 9px; padding: 8px 11px; white-space: pre-wrap;
+    }
+    .msg.dela .msg-txt { background: rgba(96,165,250,.06); }
+
     /* ─── Estados ─── */
     .vazio {
       text-align: center; padding: 34px 16px; border-radius: var(--r);
@@ -421,13 +470,64 @@ document.addEventListener('click', function (e) {
   if (e.target.closest('[data-no]')) { enviaDecisao(card, false, ''); }
 });
 
-function pinta(id, itens, urgente, vazioTxt, vazioBom) {
+/* Resolvido vira uma linha: ele corre o olho e abre só o que quiser ler.
+   Dentro, os três blocos que ele pediu: a pergunta, a resposta que a pessoa
+   recebeu, e a análise pra ele. */
+function cardLinha(i, atraso) {
+  var blocos = '';
+  if (i.relato) {
+    blocos += '<div class="fala pergunta"><span class="fala-rot">O que perguntaram</span>' +
+      '<div class="fala-txt">' + esc(i.relato) + '</div></div>';
+  }
+
+  var conversa = (i.conversa || []).filter(function (m) { return m && m.texto; });
+  if (conversa.length > 1) {
+    blocos += '<div class="fala resposta"><span class="fala-rot">Conversa</span><div>' +
+      conversa.map(function (m) {
+        return '<div class="msg' + (m.daPessoa ? ' dela' : '') + '">' +
+          '<span class="msg-de">' + esc(m.de || '') + '</span>' +
+          '<div class="msg-txt">' + esc(m.texto) + '</div></div>';
+      }).join('') + '</div></div>';
+  } else if (i.resposta) {
+    blocos += '<div class="fala resposta"><span class="fala-rot">O que respondemos</span>' +
+      '<div class="fala-txt">' + esc(i.resposta) + '</div></div>';
+  } else {
+    blocos += '<div class="fala resposta"><span class="fala-rot">O que respondemos</span>' +
+      '<div class="fala-txt" style="color:var(--text-tertiary)">Sem resposta registrada. Abra no sistema pra conferir.</div></div>';
+  }
+
+  if (i.proposta) {
+    blocos += '<div class="fala"><span class="fala-rot">O que foi feito</span>' +
+      '<div class="fala-txt">' + esc(i.proposta) + '</div></div>';
+  }
+  if (i.explicacao) {
+    blocos += '<div class="fala analise"><span class="fala-rot">Análise pra você</span>' +
+      '<div class="fala-txt">' + esc(i.explicacao) + '</div></div>';
+  }
+
+  blocos += '<div class="item-pe"><span></span><a class="abrir" href="' + esc(i.url || '#') +
+    '" target="_blank" rel="noopener">Abrir no ' + esc(i.sistemaNome || i.sistema) + ' →</a></div>';
+
+  return '<div class="item linha anim" data-linha="1" data-id="' + esc(i.id || '') + '"' +
+    ' style="--borda-cor:' + esc(i.cor || 'transparent') + ';animation-delay:' + (Number(atraso) || 0) + 's">' +
+    '<div class="linha-cab">' +
+      '<span class="linha-tag">' + esc(i.sistemaNome || i.sistema) + '</span>' +
+      (i.num ? '<span class="linha-tag">#' + esc(i.num) + '</span>' : '') +
+      '<span class="linha-titulo">' + esc(i.titulo || '(sem texto)') + '</span>' +
+      '<span class="linha-quando">' + quando(i.criadoEm) + '</span>' +
+      '<span class="linha-seta"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>' +
+    '</div><div class="linha-corpo">' + blocos + '</div></div>';
+}
+
+function pinta(id, itens, urgente, vazioTxt, vazioBom, emLinha) {
   var el = document.getElementById(id);
   if (!itens || !itens.length) {
     el.innerHTML = '<div class="vazio' + (vazioBom ? ' bom' : '') + '">' + esc(vazioTxt) + '</div>';
     return;
   }
-  el.innerHTML = itens.map(function (i, n) { return cardItem(i, urgente, n * 0.04); }).join('');
+  el.innerHTML = itens.map(function (i, n) {
+    return emLinha ? cardLinha(i, n * 0.03) : cardItem(i, urgente, n * 0.04);
+  }).join('');
 }
 
 var carregando = false;
@@ -436,6 +536,9 @@ var carregando = false;
 var DADOS = null;
 var filtroApp = null;   // null = todos
 var abaAtual = 'ativos';
+/* A pagina repinta sozinha a cada 2 min e ao voltar pra aba. Sem isto, o item
+   que ele abriu pra ler fecharia no meio da leitura. */
+var abertos = {};
 
 function soDoApp(lista) {
   var l = lista || [];
@@ -481,7 +584,7 @@ function pintaListas() {
     pinta('listaAprovado', aprovado, false, 'Nada aprovado na fila.');
     pinta('listaAberto', aberto, false, 'Nenhum relato em aberto.');
   } else {
-    pinta('listaResolvido', resolvido, false, 'Nada resolvido ainda' + doApp + '.');
+    pinta('listaResolvido', resolvido, false, 'Nada decidido por você ainda' + doApp + '.', false, true);
   }
 
   document.getElementById('secAguardando').style.display = naAba ? '' : 'none';
@@ -491,6 +594,10 @@ function pintaListas() {
 
   document.querySelectorAll('.aba').forEach(function (a) {
     a.classList.toggle('on', a.getAttribute('data-aba') === abaAtual);
+  });
+
+  document.querySelectorAll('[data-linha]').forEach(function (l) {
+    if (abertos[l.getAttribute('data-id')]) l.classList.add('aberto');
   });
 }
 
@@ -502,6 +609,13 @@ function nomeDoApp(id) {
 function repinta() { pintaFontes(); pintaListas(); }
 
 document.addEventListener('click', function (e) {
+  var linha = e.target.closest ? e.target.closest('[data-linha]') : null;
+  if (linha && !e.target.closest('a')) {
+    var aberto = linha.classList.toggle('aberto');
+    var lid = linha.getAttribute('data-id');
+    if (aberto) abertos[lid] = true; else delete abertos[lid];
+    return;
+  }
   var app = e.target.closest ? e.target.closest('[data-app]') : null;
   if (app) { var id = app.getAttribute('data-app'); filtroApp = (filtroApp === id) ? null : id; repinta(); return; }
   if (e.target.closest('#limparFiltro')) { filtroApp = null; repinta(); return; }
