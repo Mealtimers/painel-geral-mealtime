@@ -577,13 +577,21 @@ function soDoApp(lista) {
 /* Categoria e a etiqueta que a pessoa escolheu (duvida, problema, melhoria...).
    Feed antigo so manda `tipo`; ai a categoria cai nele, pra nada sumir da tela
    enquanto os tres sistemas nao mandam o campo novo. */
-function catDe(i) { return i.categoria || i.tipo || 'outros'; }
+function catDe(i) {
+  var c = i.categoria || i.tipo || 'outros';
+  // "dificuldade" so existe em relato antigo: os SACs pararam de criar e hoje
+  // vira duvida. Juntar evita um botao com 1 item velho so.
+  return c === 'dificuldade' ? 'duvida' : c;
+}
+var CAT_NOMES = {
+  problema: 'Problema', duvida: 'Dúvida', melhoria: 'Melhoria',
+  erro_ficha: 'Erro em ficha', analise: 'Retorno da análise',
+};
 function catNome(i) {
-  if (i.categoriaNome) return i.categoriaNome;
   var c = catDe(i);
-  return c === 'melhoria' ? 'Melhoria' : c === 'duvida' ? 'Dúvida'
-    : c === 'erro_ficha' ? 'Erro em ficha' : c === 'dificuldade' ? 'Dificuldade'
-    : c === 'problema' ? 'Problema' : c;
+  // Nome proprio do feed, menos quando a categoria foi reagrupada aqui.
+  if (i.categoriaNome && c === (i.categoria || i.tipo)) return i.categoriaNome;
+  return CAT_NOMES[c] || c;
 }
 
 /* Conta as categorias do que esta na aba, respeitando o filtro de app. Assim a
