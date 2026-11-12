@@ -638,8 +638,10 @@ async function fetchOverviewUnificado() {
 // ═══════════════════════════════════════
 //  SAC GERAL — reúne os SACs dos três sistemas
 // ═══════════════════════════════════════
-// O painel só REÚNE e abre no sistema de origem: quem decide é o SAC de cada
-// app, que é onde a correção entra. Por isso aqui é leitura pura, sem ação.
+// O painel reúne os três e é AQUI que o dono decide: ele lê a proposta da IA,
+// dá o OK (podendo escrever uma instrução junto) ou descarta, e cada sistema
+// executa do seu jeito. Quem corrige continua sendo o sistema de origem, que é
+// onde ficam as travas; o painel só carrega a decisão até lá.
 // Contrato do item (igual nos três): id, num, tipo, estado, titulo, relato,
 // proposta, explicacao, triagem, severidade, autor, origem, criadoEm, url.
 
@@ -715,6 +717,85 @@ async function fetchSacGeral(force = false) {
   };
   sacCache = { data, ts: Date.now() };
   return { ...data, cached: false };
+}
+
+/* ── Decisão do dono ───────────────────────────────────────────────────────
+   Cada sistema executa o OK do seu jeito, então a rota e o formato do id
+   mudam. O painel não decide nada sozinho: leva a decisão e devolve o que o
+   sistema respondeu.
+
+   - CRM        → decide por `num` (a proposta #N), não pelo id do relato.
+   - Fábrica    → marca o relato como aprovado; a correção sai depois.
+   - MealControl→ aplica a correção na ficha na hora, com as travas de lá. */
+const DESTINOS_SAC = {
+  crm: {
+    url: () => `${CRM_API_URL.replace(/\/$/, '')}/api/analysis/relatos/decidir`,
+    headers: () => (CRM_ANALYSIS_API_KEY ? { 'X-Api-Key': CRM_ANALYSIS_API_KEY } : null),
+    faltaChave: 'CRM_ANALYSIS_API_KEY',
+    // O CRM decide pela proposta numerada; item sem número não dá pra decidir.
+    corpo: (itens, aprovar, instrucao, por) => {
+      const numeros = itens.map((i) => Number(i.num)).filter((n) => Number.isFinite(n));
+      return numeros.length ? { numeros, aprovar, instrucao, por } : null;
+    },
+    semNumero: 'essa proposta ainda não tem número no CRM',
+  },
+  fabrica: {
+    url: () => `${ESTOQUE_FABRICA_URL.replace(/\/$/, '')}/api/integration/sac-decidir`,
+    headers: () => (ESTOQUE_FABRICA_API_KEY ? { 'X-Internal-Api-Key': ESTOQUE_FABRICA_API_KEY } : null),
+    faltaChave: 'ESTOQUE_FABRICA_API_KEY',
+    corpo: (itens, aprovar, instrucao, por) => ({ ids: itens.map((i) => String(i.id)), aprovar, instrucao, por }),
+  },
+  mealcontrol: {
+    url: () => `${MEALCONTROL_URL.replace(/\/$/, '')}/api/internal/sac-decidir`,
+    headers: () => (MEALCONTROL_API_KEY ? { 'x-internal-api-key': MEALCONTROL_API_KEY } : null),
+    faltaChave: 'MEALCONTROL_API_KEY',
+    corpo: (itens, aprovar, instrucao, por) => ({ ids: itens.map((i) => String(i.id)), aprovar, instrucao, por }),
+  },
+};
+
+async function decidirSac({ itens = [], aprovar = true, instrucao = '', por = 'dono' } = {}) {
+  // Agrupa por sistema: cada um recebe uma chamada só.
+  const porSistema = {};
+  const recusados = [];
+  for (const it of itens) {
+    const sis = String(it?.sistema || '');
+    if (!DESTINOS_SAC[sis]) { recusados.push({ id: it?.id, motivo: 'sistema_desconhecido' }); continue; }
+    (porSistema[sis] = porSistema[sis] || []).push(it);
+  }
+
+  const resultados = await Promise.all(Object.entries(porSistema).map(async ([sis, lista]) => {
+    const d = DESTINOS_SAC[sis];
+    const headers = d.headers();
+    if (!headers) return { sistema: sis, ok: false, erro: `${d.faltaChave} não configurada no painel` };
+    const body = d.corpo(lista, aprovar, instrucao, por);
+    if (!body) return { sistema: sis, ok: false, erro: d.semNumero || 'nada pra decidir' };
+    try {
+      const r = await fetch(d.url(), {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(15000),
+      });
+      const txt = await r.text();
+      let j = null; try { j = JSON.parse(txt); } catch {}
+      if (!r.ok) return { sistema: sis, ok: false, erro: (j && (j.message || j.error)) || `HTTP ${r.status}` };
+      return {
+        sistema: sis, ok: j?.ok !== false, erro: j?.ok === false ? (j.message || j.error || 'recusado') : null,
+        decididos: j?.decididos || [], ignorados: j?.ignorados || [],
+      };
+    } catch (e) {
+      return { sistema: sis, ok: false, erro: e.name === 'TimeoutError' ? 'timeout' : e.message };
+    }
+  }));
+
+  sacCache = { data: null, ts: 0 }; // a próxima leitura tem que vir fresca
+  const falhou = resultados.filter((r) => !r.ok);
+  return {
+    ok: falhou.length === 0,
+    aprovar, porSistema: resultados, recusados,
+    decididos: resultados.reduce((n, r) => n + (r.decididos?.length || 0), 0),
+    erro: falhou.length ? falhou.map((f) => `${f.sistema}: ${f.erro}`).join(' · ') : null,
+  };
 }
 
 let dashCache = { data: null, ts: 0 };
@@ -1259,6 +1340,25 @@ const server = http.createServer(async (req, res) => {
         const force = /(\?|&)fresh=1(&|$)/.test(req.url);
         return jsonRes(res, 200, await fetchSacGeral(force));
       } catch (err) { console.error('[SAC Geral]', err.message); return jsonRes(res, 500, { error: err.message || 'Erro SAC' }); }
+    }
+
+    if (url === '/api/sac-geral/decidir' && req.method === 'POST') {
+      const user = requireAuth(req, res); if (!user) return;
+      // Decisão do dono: só perfil admin aprova correção em outro sistema.
+      if (user.perfil !== 'admin') return jsonRes(res, 403, { error: 'Só administrador decide no SAC Geral.' });
+      try {
+        const body = await readBody(req);
+        const itens = Array.isArray(body.itens) ? body.itens : [];
+        if (!itens.length) return jsonRes(res, 400, { error: 'Nenhum item informado.' });
+        const r = await decidirSac({
+          itens,
+          aprovar: body.aprovar !== false,
+          instrucao: String(body.instrucao || '').slice(0, 2000),
+          por: user.nome || user.usuario || 'dono',
+        });
+        console.log(`[SAC Geral] ${r.aprovar ? 'aprovou' : 'descartou'} ${r.decididos} item(ns) — por ${user.usuario}`);
+        return jsonRes(res, 200, r);
+      } catch (err) { console.error('[SAC Geral] decidir:', err.message); return jsonRes(res, 500, { error: err.message || 'Erro ao decidir' }); }
     }
 
     if (url === '/api/dashboard') {

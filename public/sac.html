@@ -135,8 +135,39 @@
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
     }
     .decidir { font-size: .66rem; font-weight: 700; color: var(--amber); }
-    .abrir { font-size: .66rem; font-weight: 600; color: var(--text-tertiary); white-space: nowrap; }
-    .item:hover .abrir { color: var(--mt-red); }
+    .abrir { font-size: .66rem; font-weight: 600; color: var(--text-tertiary); white-space: nowrap; text-decoration: none; }
+    .abrir:hover { color: var(--mt-red); }
+
+    /* ─── Decisão: o OK é dado aqui, não no sistema de origem ─── */
+    .dec { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .dec-btn {
+      font-family: inherit; font-size: .68rem; font-weight: 700; cursor: pointer;
+      padding: 7px 13px; border-radius: 8px; border: 1px solid transparent; transition: all .18s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .dec-ok { background: rgba(92,184,92,.14); color: #7ee08a; border-color: rgba(92,184,92,.3); }
+    .dec-ok:hover { background: rgba(92,184,92,.24); }
+    .dec-no { background: transparent; color: var(--text-tertiary); border-color: var(--border); }
+    .dec-no:hover { color: #ff8585; border-color: rgba(188,32,38,.4); }
+    .dec-btn:disabled { opacity: .45; cursor: wait; }
+
+    .dec-form { margin-top: 10px; display: none; }
+    .item.abrindo .dec-form { display: block; }
+    .dec-form textarea {
+      width: 100%; box-sizing: border-box; resize: vertical; min-height: 56px;
+      font-family: inherit; font-size: .72rem; line-height: 1.5; color: var(--text-primary);
+      background: rgba(255,255,255,.03); border: 1px solid var(--border);
+      border-radius: 9px; padding: 9px 11px;
+    }
+    .dec-form textarea:focus { outline: none; border-color: var(--border-hover); }
+    .dec-form textarea::placeholder { color: var(--text-tertiary); }
+    .dec-form-pe { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .dec-dica { font-size: .62rem; color: var(--text-tertiary); flex: 1; }
+
+    .dec-res { margin-top: 10px; font-size: .7rem; font-weight: 600; padding: 9px 11px; border-radius: 9px; }
+    .dec-res.bom { color: #7ee08a; background: rgba(92,184,92,.1); border: 1px solid rgba(92,184,92,.22); }
+    .dec-res.ruim { color: #ffb3b3; background: rgba(188,32,38,.12); border: 1px solid rgba(188,32,38,.3); }
+    .item.decidido { opacity: .5; }
 
     /* ─── Estados ─── */
     .vazio {
@@ -190,7 +221,7 @@
 
   <div class="secao destaque" id="secAguardando">
     <div class="secao-cab"><span class="secao-nome">Esperando seu OK</span><span class="secao-n" id="nAguardando">0</span></div>
-    <div class="secao-ajuda">A IA já investigou e montou a correção. Abra no sistema para aprovar, acrescentar algo ou descartar.</div>
+    <div class="secao-ajuda">A IA já investigou e montou a correção. Dê o OK aqui mesmo, acrescentando algo se quiser, ou descarte.</div>
     <div class="lista" id="listaAguardando"><div class="sk"></div><div class="sk"></div></div>
   </div>
 
@@ -261,18 +292,94 @@ function cardItem(i, urgente, atraso) {
       '<div class="bloco-txt">' + esc(i.explicacao) + '</div></div>';
   }
 
-  var pe = '<div class="item-pe">' +
-    (urgente ? '<span class="decidir">Esperando sua decisão</span>' : '<span></span>') +
-    '<span class="abrir">Abrir no ' + esc(i.sistemaNome || i.sistema) + ' →</span></div>';
+  var abrir = '<a class="abrir" href="' + esc(i.url || '#') + '" target="_blank" rel="noopener">Abrir no ' +
+    esc(i.sistemaNome || i.sistema) + ' →</a>';
 
-  return '<a class="item anim' + (urgente ? ' urgente' : '') + '"' +
-    ' style="--borda-cor:' + esc(i.cor || 'transparent') + ';animation-delay:' + (Number(atraso) || 0) + 's"' +
-    ' href="' + esc(i.url || '#') + '" target="_blank" rel="noopener">' +
+  // Esperando decisão: o OK é dado aqui. O resto continua sendo só leitura.
+  var pe;
+  if (urgente) {
+    pe = '<div class="item-pe"><div class="dec">' +
+      '<button type="button" class="dec-btn dec-ok" data-ok="1">Dar OK</button>' +
+      '<button type="button" class="dec-btn dec-no" data-no="1">Descartar</button>' +
+      '</div>' + abrir + '</div>' +
+      '<div class="dec-form">' +
+      '<textarea rows="2" placeholder="Quer acrescentar alguma coisa? (opcional)"></textarea>' +
+      '<div class="dec-form-pe">' +
+      '<span class="dec-dica">Vai junto com o OK, como instrução interna.</span>' +
+      '<button type="button" class="dec-btn dec-ok" data-confirmar="1">Confirmar</button>' +
+      '<button type="button" class="dec-btn dec-no" data-cancelar="1">Cancelar</button>' +
+      '</div></div>';
+  } else {
+    pe = '<div class="item-pe"><span></span>' + abrir + '</div>';
+  }
+
+  return '<div class="item anim' + (urgente ? ' urgente' : '') + '"' +
+    ' data-sistema="' + esc(i.sistema || '') + '" data-id="' + esc(i.id || '') + '"' +
+    ' data-num="' + esc(i.num == null ? '' : i.num) + '"' +
+    ' style="--borda-cor:' + esc(i.cor || 'transparent') + ';animation-delay:' + (Number(atraso) || 0) + 's">' +
     '<div class="item-topo">' + tags + '</div>' +
     '<div class="item-titulo">' + esc(i.titulo || '(sem texto)') + '</div>' +
     (quem ? '<div class="item-quem">' + quem + '</div>' : '') +
-    blocos + pe + '</a>';
+    blocos + pe + '</div>';
 }
+
+/* ── Decisão ──────────────────────────────────────────────────────────────
+   Um clique em "Dar OK" abre o campo pra acrescentar algo; "Descartar" vai
+   direto, porque descartar não precisa de explicação pra ninguém. */
+function itemDoCard(card) {
+  var num = card.getAttribute('data-num');
+  return { sistema: card.getAttribute('data-sistema'), id: card.getAttribute('data-id'), num: num === '' ? null : num };
+}
+
+function mostraResultado(card, texto, bom) {
+  var velho = card.querySelector('.dec-res');
+  if (velho) velho.remove();
+  var d = document.createElement('div');
+  d.className = 'dec-res ' + (bom ? 'bom' : 'ruim');
+  d.textContent = texto;
+  card.appendChild(d);
+}
+
+function enviaDecisao(card, aprovar, instrucao) {
+  var botoes = card.querySelectorAll('.dec-btn');
+  botoes.forEach(function (b) { b.disabled = true; });
+  fetch('/api/sac-geral/decidir', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+    body: JSON.stringify({ itens: [itemDoCard(card)], aprovar: aprovar, instrucao: instrucao || '' })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d.ok) {
+      card.classList.remove('abrindo');
+      card.classList.add('decidido');
+      mostraResultado(card, aprovar ? 'OK dado. O sistema corrige e avisa quem relatou.' : 'Descartado.', true);
+      setTimeout(function () { carregar(true); }, 1600);
+      return;
+    }
+    botoes.forEach(function (b) { b.disabled = false; });
+    mostraResultado(card, d.erro || d.error || 'Não deu pra decidir agora.', false);
+  }).catch(function () {
+    botoes.forEach(function (b) { b.disabled = false; });
+    mostraResultado(card, 'Erro de conexão.', false);
+  });
+}
+
+document.addEventListener('click', function (e) {
+  var card = e.target.closest ? e.target.closest('.item') : null;
+  if (!card) return;
+  if (e.target.closest('[data-ok]') && !e.target.closest('[data-confirmar]')) {
+    card.classList.add('abrindo');
+    var t = card.querySelector('.dec-form textarea');
+    if (t) t.focus();
+    return;
+  }
+  if (e.target.closest('[data-cancelar]')) { card.classList.remove('abrindo'); return; }
+  if (e.target.closest('[data-confirmar]')) {
+    var ta = card.querySelector('.dec-form textarea');
+    enviaDecisao(card, true, ta ? ta.value.trim() : '');
+    return;
+  }
+  if (e.target.closest('[data-no]')) { enviaDecisao(card, false, ''); }
+});
 
 function pinta(id, itens, urgente, vazioTxt, vazioBom) {
   var el = document.getElementById(id);
