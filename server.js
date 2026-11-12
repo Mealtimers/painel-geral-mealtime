@@ -63,7 +63,12 @@ const CRM_API_URL = process.env.CRM_API_URL || 'https://crm.mealtime.com.br';
 // pagina como "sem conexao" em vez de sumir calado.
 const CRM_ANALYSIS_API_KEY = process.env.CRM_ANALYSIS_API_KEY || process.env.ANALYSIS_API_KEY || '';
 const MEALCONTROL_URL = process.env.MEALCONTROL_URL || 'https://mealcontrol.mealtime.com.br';
-const MEALCONTROL_API_KEY = process.env.MEALCONTROL_API_KEY || '';
+// MealControl e Estoque Fábrica sao dois servicos do MESMO projeto no Railway e
+// compartilham a INTERNAL_API_KEY (e assim que a Fabrica le o custo dos pratos
+// de la). O painel ja tem esse valor, entao reaproveita em vez de pedir a mesma
+// chave duas vezes. Setar MEALCONTROL_API_KEY continua funcionando e tem
+// precedencia, pro dia em que as chaves forem separadas.
+const MEALCONTROL_API_KEY = process.env.MEALCONTROL_API_KEY || ESTOQUE_FABRICA_API_KEY || '';
 
 // ── Data dir ──
 const DATA_DIR = process.env.DATA_DIR || './data';
