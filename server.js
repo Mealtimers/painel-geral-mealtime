@@ -778,7 +778,10 @@ const DESTINOS_SAC = {
       const numeros = itens.map((i) => Number(i.num)).filter((n) => Number.isFinite(n));
       return numeros.length ? { numeros, aprovar, instrucao, por } : null;
     },
-    semNumero: 'essa proposta ainda não tem número no CRM',
+    // Mensagem pra ele, não pra mim: o CRM decide pela proposta numerada, então
+    // relato sem proposta (dúvida respondida, por exemplo) ainda precisa ser
+    // encerrado lá dentro. Ver pedido de rota por id na sessão do CRM.
+    semNumero: 'Esse ainda precisa ser encerrado dentro do CRM. Clique em "Abrir no CRM".',
   },
   fabrica: {
     url: () => `${ESTOQUE_FABRICA_URL.replace(/\/$/, '')}/api/integration/sac-decidir`,

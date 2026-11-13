@@ -323,8 +323,8 @@
   </div>
 
   <div class="secao" id="secAprovado">
-    <div class="secao-cab"><span class="secao-nome">Aprovado, aguardando correção</span><span class="secao-n" id="nAprovado">0</span></div>
-    <div class="secao-ajuda">Você já deu o OK. A rotina corrige e avisa quem relatou.</div>
+    <div class="secao-cab"><span class="secao-nome">Em desenvolvimento</span><span class="secao-n" id="nAprovado">0</span></div>
+    <div class="secao-ajuda">Você já deu o OK e a correção está sendo feita. Some daqui quando ficar pronta, e quem relatou é avisado. A rotina trabalha de segunda a sábado, 8h e 14h no CRM, 9h e 15h na Fábrica.</div>
     <div class="lista" id="listaAprovado"></div>
   </div>
 
@@ -481,13 +481,18 @@ document.addEventListener('click', function (e) {
     enviaDecisao(card, true, ta ? ta.value.trim() : '');
     return;
   }
+  if (e.target.closest('[data-dispensar]')) {
+    e.stopPropagation();   // nao deixa o clique fechar a linha junto
+    enviaDecisao(card, false, '');
+    return;
+  }
   if (e.target.closest('[data-no]')) { enviaDecisao(card, false, ''); }
 });
 
 /* Resolvido vira uma linha: ele corre o olho e abre só o que quiser ler.
    Dentro, os três blocos que ele pediu: a pergunta, a resposta que a pessoa
    recebeu, e a análise pra ele. */
-function cardLinha(i, atraso) {
+function cardLinha(i, atraso, podeDispensar) {
   var blocos = '';
   if (i.relato) {
     blocos += '<div class="fala pergunta"><span class="fala-rot">O que perguntaram</span>' +
@@ -531,10 +536,17 @@ function cardLinha(i, atraso) {
       '<div class="fala-txt">' + esc(i.explicacao) + '</div></div>';
   }
 
-  blocos += '<div class="item-pe"><span></span><a class="abrir" href="' + esc(i.url || '#') +
+  /* Dúvida respondida não vira proposta nem some sozinha: sem um jeito de
+     dispensar, a aba vira depósito. O botão só existe em acompanhamento;
+     resolvido já foi decidido. */
+  var dispensar = podeDispensar
+    ? '<button type="button" class="dec-btn dec-no" data-dispensar="1">Não precisa acompanhar</button>'
+    : '<span></span>';
+  blocos += '<div class="item-pe">' + dispensar + '<a class="abrir" href="' + esc(i.url || '#') +
     '" target="_blank" rel="noopener">Abrir no ' + esc(i.sistemaNome || i.sistema) + ' →</a></div>';
 
   return '<div class="item linha anim" data-linha="1" data-id="' + esc(i.id || '') + '"' +
+    ' data-sistema="' + esc(i.sistema || '') + '" data-num="' + esc(i.num == null ? '' : i.num) + '"' +
     ' style="--borda-cor:' + esc(i.cor || 'transparent') + ';animation-delay:' + (Number(atraso) || 0) + 's">' +
     '<div class="linha-cab">' +
       '<span class="linha-tag">' + esc(i.sistemaNome || i.sistema) + '</span>' +
@@ -545,14 +557,14 @@ function cardLinha(i, atraso) {
     '</div><div class="linha-corpo">' + blocos + '</div></div>';
 }
 
-function pinta(id, itens, urgente, vazioTxt, vazioBom, emLinha) {
+function pinta(id, itens, urgente, vazioTxt, vazioBom, emLinha, podeDispensar) {
   var el = document.getElementById(id);
   if (!itens || !itens.length) {
     el.innerHTML = '<div class="vazio' + (vazioBom ? ' bom' : '') + '">' + esc(vazioTxt) + '</div>';
     return;
   }
   el.innerHTML = itens.map(function (i, n) {
-    return emLinha ? cardLinha(i, n * 0.03) : cardItem(i, urgente, n * 0.04);
+    return emLinha ? cardLinha(i, n * 0.03, podeDispensar) : cardItem(i, urgente, n * 0.04);
   }).join('');
 }
 
@@ -665,10 +677,10 @@ function pintaListas() {
   var recorte = daCat + doApp;
   if (naAba) {
     pinta('listaAguardando', aguardando, true, 'Nada' + recorte + ' esperando por você.', true);
-    pinta('listaAprovado', aprovado, false, 'Nada' + recorte + ' aprovado na fila.');
+    pinta('listaAprovado', aprovado, false, 'Nada' + recorte + ' em desenvolvimento.', false, true);
     // Em acompanhamento também vai em linha: nada aqui depende dele, então é
     // leitura. Ele corre o olho e abre só o que quiser ler.
-    pinta('listaAberto', aberto, false, 'Nenhum relato' + recorte + ' em acompanhamento.', false, true);
+    pinta('listaAberto', aberto, false, 'Nenhum relato' + recorte + ' em acompanhamento.', false, true, true);
   } else {
     pinta('listaResolvido', resolvido, false, 'Nada' + recorte + ' decidido por você ainda.', false, true);
   }
@@ -701,7 +713,7 @@ function repinta() { pintaFontes(); pintaListas(); }
 
 document.addEventListener('click', function (e) {
   var linha = e.target.closest ? e.target.closest('[data-linha]') : null;
-  if (linha && !e.target.closest('a')) {
+  if (linha && !e.target.closest('a') && !e.target.closest('button')) {
     var aberto = linha.classList.toggle('aberto');
     var lid = linha.getAttribute('data-id');
     if (aberto) abertos[lid] = true; else delete abertos[lid];
