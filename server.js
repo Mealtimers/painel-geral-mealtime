@@ -773,15 +773,24 @@ const DESTINOS_SAC = {
       ? { Authorization: `Bearer ${userToken}` }
       : (CRM_ANALYSIS_API_KEY ? { 'X-Api-Key': CRM_ANALYSIS_API_KEY } : null)),
     faltaChave: 'CRM_ANALYSIS_API_KEY',
-    // O CRM decide pela proposta numerada; item sem número não dá pra decidir.
+    /* Manda id e, quando existe, o número da proposta. O id cobre o relato sem
+       proposta (dúvida respondida, que ele dispensa em "Em acompanhamento"); o
+       número é o caminho canônico da proposta. O CRM aceita os dois juntos e é
+       idempotente, então o que já foi decidido volta em `ignorados`. */
     corpo: (itens, aprovar, instrucao, por) => {
-      const numeros = itens.map((i) => Number(i.num)).filter((n) => Number.isFinite(n));
-      return numeros.length ? { numeros, aprovar, instrucao, por } : null;
+      const ids = itens.map((i) => String(i.id || '')).filter(Boolean);
+      // Atenção: Number(null) é 0 e passa no isFinite, então item sem proposta
+      // mandaria o número 0, que não existe. Descarta o vazio ANTES de converter.
+      const numeros = itens
+        .filter((i) => i.num !== null && i.num !== undefined && i.num !== '')
+        .map((i) => Number(i.num))
+        .filter((n) => Number.isFinite(n));
+      if (!ids.length && !numeros.length) return null;
+      const body = { aprovar, instrucao, por };
+      if (ids.length) body.ids = ids;
+      if (numeros.length) body.numeros = numeros;
+      return body;
     },
-    // Mensagem pra ele, não pra mim: o CRM decide pela proposta numerada, então
-    // relato sem proposta (dúvida respondida, por exemplo) ainda precisa ser
-    // encerrado lá dentro. Ver pedido de rota por id na sessão do CRM.
-    semNumero: 'Esse ainda precisa ser encerrado dentro do CRM. Clique em "Abrir no CRM".',
   },
   fabrica: {
     url: () => `${ESTOQUE_FABRICA_URL.replace(/\/$/, '')}/api/integration/sac-decidir`,
